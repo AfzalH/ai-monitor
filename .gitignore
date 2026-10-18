@@ -1,0 +1,32 @@
+.build/
+.DS_Store
+dist/
+*.xcuserstate
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!.env.template
+secrets/
+.secrets/
+credentials/
+credentials.json
+credentials.*.json
+auth.json
+accounts.json
+cookies.txt
+cookies.json
+*.keychain
+*.keychain-db
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.mobileprovision
+
+# Local tools, logs, and captures
+.swiftpm/
+xcuserdata/
+*.log
