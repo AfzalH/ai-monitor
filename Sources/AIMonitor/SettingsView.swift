@@ -86,7 +86,7 @@ struct SettingsView: View {
             Text("Opening refreshes at most once per minute. Refresh respects provider cooldowns. Reconnect when a session expires.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
-                Link("Privacy policy", destination: URL(string: "https://github.com/AfzalH/ai-monitor/blob/main/docs/privacy.md")!)
+                Link("Privacy policy", destination: URL(string: "https://www.srizon.com/privacy")!)
                 Spacer()
                 Button("Quit AI Monitor") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
             }

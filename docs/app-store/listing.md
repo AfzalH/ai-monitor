@@ -7,10 +7,10 @@ Secondary category: Productivity
 Primary language: English (U.S.)
 Price: Free
 Registered App Store bundle ID: com.afzalh.aimonitor
-Version: 1.0.0, build 14
+Version: 1.0.0, build 15
 Support URL: https://github.com/AfzalH/ai-monitor/issues
 Marketing URL: https://github.com/AfzalH/ai-monitor
-Privacy policy URL after publication: https://github.com/AfzalH/ai-monitor/blob/main/docs/privacy.md
+Privacy policy URL: https://www.srizon.com/privacy
 Keywords: quota,usage,AI,subscription,monitor,menu bar,limits,reset,productivity
 
 ## Promotional text
