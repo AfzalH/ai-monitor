@@ -22,3 +22,9 @@ The App Store bundle uses `com.afzalh.aimonitor`, separate from the GitHub app's
 - Upload and validate through Xcode Organizer or Transporter. Choose the processed build before submitting for review.
 
 References: [Distribution preparation](https://developer.apple.com/documentation/xcode/preparing-your-app-for-distribution), [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [Mac screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/).
+
+## Xcode Cloud
+
+The shared Xcode project and AIMonitor scheme are committed so Xcode Cloud can discover them. Regenerate with `xcodegen generate --spec AppStore/project.yml` after changing project.yml or adding source files, and commit the generated project changes. User-specific Xcode state and signing assets remain ignored.
+
+The initial workflow archives the macOS app when main changes. It does not automatically submit App Review or distribute to testers. The SwiftPM test suite is separate from the Xcode scheme.

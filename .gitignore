@@ -31,8 +31,7 @@ cookies.json
 xcuserdata/
 *.log
 
-# Generated App Store project and signing assets
-AppStore/*.xcodeproj/
+# App Store signing assets
 *.provisionprofile
 *.xcarchive/
 *.xcresult/
