@@ -4,6 +4,10 @@ A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and Open
 
 ## Screenshots
 
+See remaining quota for your selected accounts directly in the macOS menu bar.
+
+<img src="docs/images/menu-bar.png" alt="AI Monitor gauge icon in the macOS menu bar with two accounts showing 95% and 79% remaining" width="366">
+
 Monitor multiple subscriptions, including separate Codex accounts, with reset countdowns and banked resets.
 
 <img src="docs/images/usage-popover.png" alt="AI Monitor popout showing Claude, two Codex accounts, and OpenCode Go usage" width="520">
