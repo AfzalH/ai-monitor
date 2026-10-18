@@ -2,6 +2,18 @@
 
 A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and OpenCode accounts. Requires macOS 14 or later. No third-party package dependencies.
 
+## Install
+
+[Download AI Monitor for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.12/AI-Monitor-0.1.12.zip)
+
+1. Download and unzip **AI-Monitor-0.1.12.zip**.
+2. Drag **AI Monitor.app** into **Applications**.
+3. Open **AI Monitor** and click the gauge icon in the menu bar to add your accounts.
+
+Requires macOS 14 or later. The app supports Apple Silicon and Intel Macs and is signed with Developer ID and notarized by Apple. Enable **Launch at login** in Settings if you want it to start automatically.
+
+See [GitHub Releases](https://github.com/AfzalH/ai-monitor/releases) for release notes and SHA-256 checksums. To update, quit AI Monitor and replace the app in Applications. Your saved accounts remain in Keychain and Application Support.
+
 ## Screenshots
 
 See remaining quota for your selected accounts directly in the macOS menu bar.
@@ -20,7 +32,7 @@ Expand an account to see additional limits, such as OpenCode Go's monthly quota.
 
 <img src="docs/images/expanded-limits.png" alt="Expanded OpenCode Go account showing five-hour, weekly, and monthly limits" width="520">
 
-## Run
+## Build from source
 
 ```sh
 ./scripts/build-app.sh
