@@ -1,10 +1,12 @@
-# AI Monitor
+# QuotaBar for AI
 
 A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and OpenCode accounts. Requires macOS 14 or later. No third-party package dependencies.
 
 ## Install
 
-[Download AI Monitor for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.12/AI-Monitor-0.1.12.zip)
+[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.12/AI-Monitor-0.1.12.zip)
+
+Previously named AI Monitor. The current GitHub release, v0.1.12, still uses that name for its ZIP and app bundle. The Mac App Store version is named QuotaBar for AI and is awaiting Apple review.
 
 1. Download and unzip **AI-Monitor-0.1.12.zip**.
 2. Drag **AI Monitor.app** into **Applications**.
@@ -18,11 +20,11 @@ See [GitHub Releases](https://github.com/AfzalH/ai-monitor/releases) for release
 
 See remaining quota for your selected accounts directly in the macOS menu bar.
 
-<img src="docs/images/menu-bar.png" alt="AI Monitor gauge icon in the macOS menu bar with two accounts showing 95% and 79% remaining" width="366">
+<img src="docs/images/menu-bar.png" alt="QuotaBar for AI gauge icon in the macOS menu bar with two accounts showing 95% and 79% remaining" width="366">
 
 Monitor multiple subscriptions, including separate Codex accounts, with reset countdowns and banked resets.
 
-<img src="docs/images/usage-popover.png" alt="AI Monitor popout showing Claude, two Codex accounts, and OpenCode Go usage" width="520">
+<img src="docs/images/usage-popover.png" alt="QuotaBar for AI popout showing Claude, two Codex accounts, and OpenCode Go usage" width="520">
 
 Choose which accounts appear in the menu bar, set optional prefixes, and adjust the popout height.
 
