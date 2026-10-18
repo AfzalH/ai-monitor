@@ -73,7 +73,9 @@ struct SetupView: View {
                 }.disabled(busy || secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             } else {
                 HStack {
+                    #if !APP_STORE
                     Button("Import current Codex login") { importCodex(URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_HOME"] ?? (NSHomeDirectory() + "/.codex")).appendingPathComponent("auth.json")) }
+                    #endif
                     Button("Choose auth.json…") {
                         let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
                         panel.allowedContentTypes = [.json]; panel.showsHiddenFiles = true
@@ -107,6 +109,8 @@ struct SetupView: View {
     }
     private func reset() { generation = UUID(); operation?.cancel(); login?.close(); login = nil; credential = nil; workspaces = []; selectedWorkspace = ""; secret = ""; scope = ""; error = nil }
     private func importCodex(_ url: URL) {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         do { prepare(try Credential.codexFile(Data(contentsOf: url))) }
         catch { self.error = error.localizedDescription }
     }

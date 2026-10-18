@@ -1,0 +1,52 @@
+name: AIMonitorAppStore
+options:
+  deploymentTarget:
+    macOS: '14.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    MACOSX_DEPLOYMENT_TARGET: '14.0'
+    DEVELOPMENT_TEAM: 8TWJM99T9H
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    MARKETING_VERSION: '1.0.0'
+    CURRENT_PROJECT_VERSION: '14'
+    ARCHS: 'arm64 x86_64'
+    ONLY_ACTIVE_ARCH: NO
+targets:
+  MonitorCore:
+    type: library.static
+    platform: macOS
+    sources:
+      - ../Sources/MonitorCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.afzalh.aimonitor.core
+        SKIP_INSTALL: YES
+        DEFINES_MODULE: YES
+  AIMonitor:
+    type: application
+    platform: macOS
+    sources:
+      - ../Sources/AIMonitor
+      - path: Assets.xcassets
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - target: MonitorCore
+        embed: false
+    settings:
+      base:
+        PRODUCT_NAME: QuotaBar for AI
+        PRODUCT_MODULE_NAME: AIMonitor
+        PRODUCT_BUNDLE_IDENTIFIER: com.afzalh.aimonitor
+        CODE_SIGN_ENTITLEMENTS: AIMonitor.entitlements
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Info.plist
+        SKIP_INSTALL: NO
+    scheme:
+      gatherCoverageData: false
+      archive:
+        config: Release

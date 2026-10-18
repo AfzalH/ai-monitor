@@ -30,3 +30,9 @@ cookies.json
 .swiftpm/
 xcuserdata/
 *.log
+
+# Generated App Store project and signing assets
+AppStore/*.xcodeproj/
+*.provisionprofile
+*.xcarchive/
+*.xcresult/

@@ -85,7 +85,11 @@ struct SettingsView: View {
             }
             Text("Opening refreshes at most once per minute. Refresh respects provider cooldowns. Reconnect when a session expires.")
                 .font(.caption).foregroundStyle(.secondary)
-            Button("Quit AI Monitor") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
+            HStack {
+                Link("Privacy policy", destination: URL(string: "https://github.com/AfzalH/ai-monitor/blob/main/docs/privacy.md")!)
+                Spacer()
+                Button("Quit AI Monitor") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
+            }
             if let error = renameError ?? store.storageError ?? loginError { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
         }.padding(24).frame(width: 650, height: 690)
             .sheet(isPresented: $adding) { SetupView().environmentObject(store) }
