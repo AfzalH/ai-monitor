@@ -2,6 +2,20 @@
 
 A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and OpenCode accounts. Requires macOS 14 or later. No third-party package dependencies.
 
+## Screenshots
+
+Monitor multiple subscriptions, including separate Codex accounts, with reset countdowns and banked resets.
+
+<img src="docs/images/usage-popover.png" alt="AI Monitor popout showing Claude, two Codex accounts, and OpenCode Go usage" width="520">
+
+Choose which accounts appear in the menu bar, set optional prefixes, and adjust the popout height.
+
+<img src="docs/images/account-settings.png" alt="Account settings with per-account menu bar checkboxes, prefix fields, ordering, and display options" width="650">
+
+Expand an account to see additional limits, such as OpenCode Go's monthly quota.
+
+<img src="docs/images/expanded-limits.png" alt="Expanded OpenCode Go account showing five-hour, weekly, and monthly limits" width="520">
+
 ## Run
 
 ```sh
@@ -9,7 +23,7 @@ A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and Open
 open "dist/AI Monitor.app"
 ```
 
-Click **AI** in the menu bar, then **Add your first account**. The gear opens account management. You can move the app to Applications after building. Enable launch at login from its settings after moving it.
+Click the gauge icon in the menu bar, then **Add your first account**. The gear opens account management. You can move the app to Applications after building. Enable launch at login from its settings after moving it.
 
 The menu bar can show several accounts, including multiple accounts from the same provider, with optional prefixes such as `x1 80% · x2 50%`. Each connected account row in Settings has its own Menu bar checkbox and prefix. Prefixes are empty by default. The first account is selected by default. Selections and prefixes stay with the account when renamed or reordered. Only selected accounts refresh in the background. Codex and OpenCode check once per minute. Claude checks no more often than every five minutes, across automatic and manual refreshes. Uncheck every account for an icon-only menu item. The compact popover shows 5-hour and weekly limits by default, with Show more for additional windows, plus reset countdowns and Codex banked resets. Settings contains the Used / Remaining switch, account renaming and ordering, and a maximum popout height control, defaulting to 40% of the screen. The popout shrinks to fit shorter lists. Usage refreshes on opening at most once per minute, including after failed attempts. Clicking Refresh bypasses the popout cooldown, but never a provider throttle. Other accounts refresh only on opening or manual refresh.
 
