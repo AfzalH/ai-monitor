@@ -55,6 +55,7 @@ public actor ClaudeUsageThrottle {
         let identity = credential + "|" + (request.url?.absoluteString ?? "")
         let key = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
         let keys = [key] + (accountID.map { ["account:" + $0.uuidString] } ?? [])
+        let previousEntries = Dictionary(uniqueKeysWithValues: keys.compactMap { key in entries[key].map { (key, $0) } })
         let previous = keys.compactMap { entries[$0] }.max { $0.failures < $1.failures }
         if let entry = keys.compactMap({ entries[$0] }).filter({ $0.until > now }).max(by: { $0.until < $1.until }) {
             throw UsageRefreshDeferred(until: entry.until, rateLimited: entry.rateLimited)
@@ -78,6 +79,12 @@ public actor ClaudeUsageThrottle {
             for key in keys { entries[key] = Entry(until: until, failures: failures, rateLimited: true) }
             persist()
             throw UsageRefreshDeferred(until: until, rateLimited: true)
+        } catch let error as URLError where error.code == .notConnectedToInternet {
+            // No connection was made. Restore the previous gate, including its
+            // failure count, so reconnecting does not incur a fresh cooldown.
+            for key in keys { entries[key] = previousEntries[key] }
+            persist()
+            throw error
         }
         // Other failures and cancellations keep the five-minute spacing: the
         // server may have counted the request even if no response reached us.

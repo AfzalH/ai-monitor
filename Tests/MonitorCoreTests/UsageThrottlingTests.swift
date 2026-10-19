@@ -94,3 +94,36 @@ private func fixtureRequest(_ token: String = "fixture") -> URLRequest {
     }
     #expect(await successful.calls == 2)
 }
+
+private struct OfflineTransport: UsageTransport {
+    var code: URLError.Code = .notConnectedToInternet
+    func get(_ request: URLRequest) async throws -> Data { throw URLError(code) }
+}
+@Test func offlineClaudeAttemptDoesNotConsumeProviderCooldown() async throws {
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let gate = ClaudeUsageThrottle(suiteName: suite)
+    let now = Date()
+    let accountID = UUID()
+    do { _ = try await gate.get(fixtureRequest(), using: OfflineTransport(), accountID: accountID, now: now) }
+    catch let error as URLError { #expect(error.code == .notConnectedToInternet) }
+    let restored = ClaudeUsageThrottle(suiteName: suite)
+    let result = try await restored.get(fixtureRequest(), using: ThrottleTransport(limited: false), accountID: accountID, now: now.addingTimeInterval(1))
+    #expect(result == Data("fixture".utf8))
+}
+
+@Test func ambiguousTimeoutKeepsClaudeCooldown() async throws {
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let gate = ClaudeUsageThrottle(suiteName: suite)
+    let now = Date()
+    do { _ = try await gate.get(fixtureRequest(), using: OfflineTransport(code: .timedOut), now: now) }
+    catch let error as URLError { #expect(error.code == .timedOut) }
+    do {
+        _ = try await gate.get(fixtureRequest(), using: ThrottleTransport(limited: false), now: now.addingTimeInterval(60))
+        Issue.record("Ambiguous timeout bypassed provider spacing")
+    } catch let deferred as UsageRefreshDeferred {
+        #expect(deferred.until == now.addingTimeInterval(300))
+        #expect(!deferred.rateLimited)
+    }
+}

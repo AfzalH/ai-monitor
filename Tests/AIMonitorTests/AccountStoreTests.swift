@@ -260,16 +260,17 @@ import SwiftUI
         try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
     }
     store.setMenuEnabled(store.accounts.first!, false)
-    let monitor = MenuBarRefreshScheduler(store: store)
+    let monitor = MenuBarRefreshScheduler(store: store, network: TestConnectivityMonitor())
     defer { monitor.stop() }
     try await Task.sleep(for: .milliseconds(80))
     #expect(await transport.calls == 0)
     store.setMenuEnabled(store.accounts.first!, true)
-    for _ in 0..<50 where await transport.calls == 0 { try await Task.sleep(for: .milliseconds(10)) }
-    #expect(await transport.calls == 1)
+    for _ in 0..<50 where store.snapshots[first.id]?.windows.first?.used != 5 { try await Task.sleep(for: .milliseconds(10)) }
+    let firstCalls = await transport.calls
+    #expect(firstCalls == 1)
     try store.moveAccount(second, by: -1)
     store.setMenuEnabled(second, true)
-    for _ in 0..<50 where await transport.calls == 1 { try await Task.sleep(for: .milliseconds(10)) }
+    for _ in 0..<50 where store.snapshots[second.id]?.windows.first?.used != 5 { try await Task.sleep(for: .milliseconds(10)) }
     #expect(await transport.calls == 2)
     monitor.stop()
     store.setMenuEnabled(store.accounts.first!, false)
@@ -286,7 +287,7 @@ import SwiftUI
     let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport), vault: MemoryVault(), defaults: defaults)
     let account = Account(name: "Top", provider: .codex)
     try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Pro", windows: [QuotaWindow("Weekly", used: 7)]))
-    let monitor = MenuBarRefreshScheduler(store: store)
+    let monitor = MenuBarRefreshScheduler(store: store, network: TestConnectivityMonitor())
     defer { monitor.stop() }
     while !(await transport.started) { await Task.yield() }
     store.setMenuEnabled(store.accounts.first!, false)
@@ -429,5 +430,147 @@ private actor RateLimitedTransport: UsageTransport {
     #expect(store.nextMenuRefreshDelay > 800)
     let restored = AccountStore(file: file, client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: vault, defaults: defaults)
     await restored.refresh()
+    #expect(await transport.calls == 1)
+}
+
+@Test @MainActor func offlineRefreshWaitsAndRetriesAllRequestedAccountsOnConnection() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let transport = CountingTransport()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    for name in ["First", "Second"] {
+        try store.save(account: Account(name: name, provider: .claude), credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    }
+    store.setNetworkAvailable(false)
+    await store.refresh(onOpen: true)
+    await store.refreshMenuAccounts()
+    #expect(await transport.calls == 0)
+    store.setNetworkAvailable(true)
+    await store.refreshPendingAccounts()
+    #expect(await transport.calls == 2)
+    #expect(store.snapshots.values.allSatisfy { $0.windows.first?.used == 5 })
+    await store.refreshPendingAccounts()
+    #expect(await transport.calls == 2)
+}
+
+private actor RecoveringTransport: UsageTransport {
+    var offline = true
+    var calls = 0
+    func get(_ request: URLRequest) async throws -> Data {
+        calls += 1
+        if offline { throw URLError(.notConnectedToInternet) }
+        return Data(#"{"five_hour":{"utilization":8}}"#.utf8)
+    }
+    func connect() { offline = false }
+}
+@Test @MainActor func connectionFailureRetriesNonMenuAccountWithoutWaitingForOpenCooldown() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let transport = RecoveringTransport()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Not in menu", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    store.setMenuEnabled(account, false)
+    await store.refresh(onOpen: true)
+    #expect(store.errors[account.id] != nil)
+    await store.refreshPendingAccounts()
+    #expect(await transport.calls == 1)
+    await transport.connect()
+    store.setNetworkAvailable(false)
+    store.setNetworkAvailable(true)
+    await store.refreshPendingAccounts()
+    #expect(store.errors[account.id] == nil)
+    #expect(store.snapshots[account.id]?.windows.first?.used == 8)
+    await store.refreshPendingAccounts()
+    #expect(await transport.calls == 2)
+}
+@Test @MainActor func reconnectDoesNotBypassProviderBackoff() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let transport = RateLimitedTransport()
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Claude", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    await store.refresh()
+    store.setNetworkAvailable(false)
+    await store.refresh()
+    store.setNetworkAvailable(true)
+    await store.refreshPendingAccounts()
+    #expect(await transport.calls == 1)
+    #expect(store.errors[account.id]?.contains("Paused until") == true)
+}
+
+@MainActor private final class TestConnectivityMonitor: ConnectivityMonitoring {
+    var changed: (@Sendable (Bool) -> Void)?
+    var connected = true
+    func start(_ changed: @escaping @Sendable (Bool) -> Void) {
+        self.changed = changed
+        changed(connected)
+    }
+    func cancel() { changed = nil }
+    func setConnected(_ connected: Bool) { self.connected = connected; changed?(connected) }
+}
+
+@Test @MainActor func schedulerWaitsForNetworkAndFetchesWhenItReturns() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let transport = CountingTransport()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Startup", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    let network = TestConnectivityMonitor()
+    network.connected = false
+    let scheduler = MenuBarRefreshScheduler(store: store, network: network)
+    defer { scheduler.stop() }
+    await store.refresh()
+    try await Task.sleep(for: .milliseconds(40))
+    #expect(await transport.calls == 0)
+    network.setConnected(true)
+    for _ in 0..<100 where store.snapshots[account.id]?.windows.first?.used != 5 {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(store.snapshots[account.id]?.windows.first?.used == 5)
+    #expect(await transport.calls == 1)
+    network.setConnected(false)
+    network.setConnected(true)
+    try await Task.sleep(for: .milliseconds(40))
+    #expect(await transport.calls == 1)
+}
+
+private actor WaitingClaudeTransport: UsageTransport {
+    var waiting: CheckedContinuation<Void, Never>?
+    var calls = 0
+    func get(_ request: URLRequest) async throws -> Data {
+        calls += 1
+        await withCheckedContinuation { waiting = $0 }
+        try Task.checkCancellation()
+        return Data(#"{"five_hour":{"utilization":8}}"#.utf8)
+    }
+    func release() { waiting?.resume(); waiting = nil }
+}
+@Test @MainActor func connectivityFlapDoesNotCancelRunningClaudeRequest() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let transport = WaitingClaudeTransport()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Claude", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    let network = TestConnectivityMonitor()
+    let scheduler = MenuBarRefreshScheduler(store: store, network: network)
+    defer { scheduler.stop() }
+    for _ in 0..<100 where await transport.calls == 0 { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(await transport.calls == 1)
+    network.setConnected(false)
+    try await Task.sleep(for: .milliseconds(40))
+    network.setConnected(true)
+    try await Task.sleep(for: .milliseconds(40))
+    await transport.release()
+    for _ in 0..<100 where store.snapshots[account.id]?.windows.first?.used != 8 { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(store.snapshots[account.id]?.windows.first?.used == 8)
+    #expect(store.errors[account.id] == nil)
     #expect(await transport.calls == 1)
 }

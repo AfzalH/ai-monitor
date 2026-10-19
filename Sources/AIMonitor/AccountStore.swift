@@ -59,6 +59,10 @@ struct Keychain: CredentialVault {
     private let vault: any CredentialVault
     private var revisions: [UUID: UUID] = [:]
     private var lastRefreshAttempt: Date?
+    private var networkAvailable = true
+    private var pendingNetworkRefresh: Set<UUID> = []
+    private var networkRetryAfter: [UUID: Date] = [:]
+
     private let now: () -> Date
     private let file: URL
     init(file: URL? = nil, client: UsageClient = UsageClient(), vault: any CredentialVault = Keychain(), now: @escaping () -> Date = Date.init, defaults: UserDefaults = .standard) {
@@ -85,6 +89,19 @@ struct Keychain: CredentialVault {
             menuAccountChoices = choices
             defaults.set(choices, forKey: "menuAccountChoices")
             defaults.set(menuAccountPrefixes, forKey: "menuAccountPrefixes")
+        }
+    }
+    var hasRequestsInFlight: Bool { !inFlight.isEmpty }
+
+    func setNetworkAvailable(_ available: Bool) {
+        if available && !networkAvailable { networkRetryAfter.removeAll() }
+        networkAvailable = available
+    }
+    func refreshPendingAccounts() async {
+        guard networkAvailable, !demo else { return }
+        for account in accounts where pendingNetworkRefresh.contains(account.id) {
+            guard !Task.isCancelled else { return }
+            await refreshAccount(account, respectCooldown: true)
         }
     }
     private func persist(_ accounts: [Account]) throws {
@@ -137,6 +154,11 @@ struct Keychain: CredentialVault {
     }
     func refresh(onOpen: Bool = false) async {
         guard !refreshing, !demo, !accounts.isEmpty else { return }
+        guard networkAvailable else {
+            pendingNetworkRefresh.formUnion(accounts.map(\.id))
+            for account in accounts where errors[account.id] == nil { errors[account.id] = "Waiting for a network connection. Usage will refresh automatically." }
+            return
+        }
         let date = now()
         if onOpen, let lastRefreshAttempt, date.timeIntervalSince(lastRefreshAttempt) < 60 { return }
         // Failed attempts also consume the cooldown, so opening cannot hammer a
@@ -164,7 +186,7 @@ struct Keychain: CredentialVault {
     }
     var menuAccounts: [Account] { accounts.filter { isMenuEnabled($0) } }
     func refreshMenuAccounts() async {
-        guard !refreshing, !demo else { return }
+        guard networkAvailable, !refreshing, !demo else { return }
         for account in menuAccounts {
             guard !Task.isCancelled else { return }
             await refreshAccount(account, respectCooldown: true)
@@ -172,6 +194,8 @@ struct Keychain: CredentialVault {
     }
     var nextMenuRefreshDelay: TimeInterval {
         menuAccounts.map { account -> TimeInterval in
+            if !networkAvailable { return 60 }
+            if let retry = networkRetryAfter[account.id], retry > now() { return retry.timeIntervalSince(now()) }
             if refreshing || inFlight.contains(account.id) { return 1 }
             if let until = deferredUntil[account.id], until > now() { return until.timeIntervalSince(now()) }
             guard let attempt = accountAttempts[account.id] else { return 1 }
@@ -179,8 +203,13 @@ struct Keychain: CredentialVault {
         }.min() ?? 60
     }
     private func refreshAccount(_ account: Account, respectCooldown: Bool) async {
+        guard networkAvailable else {
+            pendingNetworkRefresh.insert(account.id)
+            return
+        }
         guard !inFlight.contains(account.id) else { return }
         let date = now()
+        if let retry = networkRetryAfter[account.id], retry > date { return }
         if let until = deferredUntil[account.id], until > date { return }
         if respectCooldown, let attempted = accountAttempts[account.id], date.timeIntervalSince(attempted) < 60 { return }
         let previousAttempt = accountAttempts[account.id]
@@ -198,6 +227,8 @@ struct Keychain: CredentialVault {
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             snapshots[account.id] = result; errors[account.id] = nil
             deferredUntil[account.id] = nil
+            pendingNetworkRefresh.remove(account.id)
+            networkRetryAfter[account.id] = nil
         } catch let deferred as UsageRefreshDeferred {
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             deferredUntil[account.id] = deferred.until
@@ -207,10 +238,17 @@ struct Keychain: CredentialVault {
             let until = max(now().addingTimeInterval(60), limited.retryAt ?? now())
             deferredUntil[account.id] = until
             errors[account.id] = "Usage checks paused until " + until.formatted(date: .omitted, time: .shortened) + "."
+        } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .timedOut].contains(error.code) {
+            guard !Task.isCancelled, revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
+            pendingNetworkRefresh.insert(account.id)
+            networkRetryAfter[account.id] = now().addingTimeInterval(60)
+            if error.code == .notConnectedToInternet { accountAttempts[account.id] = previousAttempt }
+            errors[account.id] = "Connection unavailable. Usage will retry automatically."
         } catch is CancellationError {
             // Disabling the background monitor is not an account error.
         } catch {
             if !Task.isCancelled, revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo {
+                pendingNetworkRefresh.remove(account.id)
                 errors[account.id] = error.localizedDescription
             }
         }

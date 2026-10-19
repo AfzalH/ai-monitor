@@ -15,6 +15,8 @@ public final class NetworkTransport: UsageTransport, Sendable {
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil; config.urlCache = nil
         config.timeoutIntervalForRequest = 25
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForResource = 60
         session = URLSession(configuration: config, delegate: NoRedirects(), delegateQueue: nil)
     }
     public func get(_ request: URLRequest) async throws -> Data {
