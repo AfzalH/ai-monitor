@@ -623,3 +623,34 @@ private actor AuthenticationFailureTransport: UsageTransport {
     } catch MonitorError.authenticationRequired { }
     catch { Issue.record("Missing credential did not offer reconnect: \(error.localizedDescription)") }
 }
+
+private actor AuthThenTemporaryFailure: UsageTransport {
+    let kind: Int
+    private var calls = 0
+    init(kind: Int) { self.kind = kind }
+    func get(_ request: URLRequest) async throws -> Data {
+        calls += 1
+        if calls == 1 { throw MonitorError.authenticationRequired("Sign-in expired. Reconnect this account.") }
+        if kind == 1 { throw HTTPRateLimitError(retryAt: Date().addingTimeInterval(120)) }
+        throw URLError(.notConnectedToInternet)
+    }
+}
+@Test(arguments: [0, 1, 2]) @MainActor func reconnectButtonFollowsDisplayedError(kind: Int) async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let suite = UUID().uuidString
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let vault = MemoryVault()
+    let file = dir.appendingPathComponent("accounts.json")
+    let account = Account(name: "Claude", provider: .claude)
+    let initial = AccountStore(file: file, vault: vault, defaults: defaults)
+    try initial.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    // A restarted app has no snapshot, matching the reported error-only card.
+    let store = AccountStore(file: file, client: UsageClient(transport: AuthThenTemporaryFailure(kind: kind), claudeThrottle: kind == 0 ? ClaudeUsageThrottle(suiteName: suite) : nil), vault: vault, defaults: defaults)
+    await store.refresh()
+    #expect(store.reconnectRequired.contains(account.id))
+    await store.refresh()
+    #expect(store.errors[account.id] != nil)
+    #expect(!store.reconnectRequired.contains(account.id))
+}

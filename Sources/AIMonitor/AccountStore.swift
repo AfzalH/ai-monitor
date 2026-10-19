@@ -238,17 +238,22 @@ struct Keychain: CredentialVault {
         } catch let deferred as UsageRefreshDeferred {
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             deferredUntil[account.id] = deferred.until
-            if deferred.rateLimited || snapshots[account.id] == nil { errors[account.id] = deferred.localizedDescription }
+            if deferred.rateLimited || snapshots[account.id] == nil {
+                reconnectRequired.remove(account.id)
+                errors[account.id] = deferred.localizedDescription
+            }
         } catch let limited as HTTPRateLimitError {
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             let until = max(now().addingTimeInterval(60), limited.retryAt ?? now())
             deferredUntil[account.id] = until
+            reconnectRequired.remove(account.id)
             errors[account.id] = "Usage checks paused until " + until.formatted(date: .omitted, time: .shortened) + "."
         } catch let error as URLError where [.notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .timedOut].contains(error.code) {
             guard !Task.isCancelled, revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             pendingNetworkRefresh.insert(account.id)
             networkRetryAfter[account.id] = now().addingTimeInterval(60)
             if error.code == .notConnectedToInternet { accountAttempts[account.id] = previousAttempt }
+            reconnectRequired.remove(account.id)
             errors[account.id] = "Connection unavailable. Usage will retry automatically."
         } catch is CancellationError {
             // Disabling the background monitor is not an account error.
