@@ -30,8 +30,8 @@ cat > "$app_path/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>QuotaBar for AI</string>
 <key>CFBundleDisplayName</key><string>QuotaBar for AI</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
-<key>CFBundleVersion</key><string>18</string>
-<key>CFBundleShortVersionString</key><string>0.1.17</string>
+<key>CFBundleVersion</key><string>19</string>
+<key>CFBundleShortVersionString</key><string>0.1.18</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>

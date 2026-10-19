@@ -654,3 +654,72 @@ private actor AuthThenTemporaryFailure: UsageTransport {
     #expect(store.errors[account.id] != nil)
     #expect(!store.reconnectRequired.contains(account.id))
 }
+
+@MainActor private final class RemovalFailureVault: CredentialVault {
+    var removalAttempts = 0
+    var readIDs: [UUID] = []
+    var rejectAdditionalReads = false
+    func save(_ credential: Credential, id: UUID) throws {}
+    func read(_ id: UUID) throws -> Credential { readIDs.append(id); if rejectAdditionalReads && readIDs.count > 1 { throw MonitorError.invalidPayload }; return Credential(kind: .bearer, secret: "test") }
+    func remove(_ id: UUID) throws {
+        removalAttempts += 1
+        throw MonitorError.message("Keychain ownership error (-25244).")
+    }
+}
+
+@Test @MainActor func removalPersistsEvenWhenKeychainCleanupFails() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let file = dir.appendingPathComponent("accounts.json")
+    let vault = RemovalFailureVault()
+    let defaults = UserDefaults(suiteName: UUID().uuidString)!
+    let store = AccountStore(file: file, vault: vault, defaults: defaults)
+    let account = Account(name: "Claude", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "test"), snapshot: UsageSnapshot(plan: "Pro", windows: []))
+    store.remove(account)
+    #expect(store.accounts.isEmpty)
+    #expect(store.snapshots[account.id] == nil)
+    #expect(store.menuAccounts.isEmpty)
+    #expect(AccountStore(file: file, vault: vault, defaults: defaults).accounts.isEmpty)
+    #expect(vault.removalAttempts == 1)
+    #expect(store.storageError?.contains("Account removed") == true)
+    #expect(store.storageError?.contains("credential") == true)
+    #expect(store.storageError?.contains(account.id.uuidString) == true)
+    #expect(store.storageError?.contains("com.local.ai-monitor.credentials") == true)
+}
+
+@Test @MainActor func removalDoesNotTouchKeychainIfAccountListCannotBeSaved() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let file = dir.appendingPathComponent("accounts.json")
+    let vault = RemovalFailureVault()
+    let store = AccountStore(file: file, vault: vault, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Claude", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "test"), snapshot: UsageSnapshot(plan: "Pro", windows: []))
+    try FileManager.default.removeItem(at: file)
+    try FileManager.default.createDirectory(at: file, withIntermediateDirectories: false)
+    store.remove(account)
+    #expect(store.accounts == [account])
+    #expect(vault.removalAttempts == 0)
+    #expect(store.storageError != nil)
+}
+
+@Test @MainActor func removedQueuedAccountIsNeverFetched() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let transport = DelayedTransport()
+    let vault = RemovalFailureVault()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport), vault: vault, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    vault.rejectAdditionalReads = true
+    let first = Account(name: "First", provider: .codex)
+    let second = Account(name: "Second", provider: .codex)
+    for account in [first, second] {
+        try store.save(account: account, credential: Credential(kind: .bearer, secret: "test"), snapshot: UsageSnapshot(plan: "Pro", windows: []))
+    }
+    let refresh = Task { await store.refresh() }
+    while !(await transport.started) { await Task.yield() }
+    store.remove(second)
+    await transport.release()
+    await refresh.value
+    #expect(vault.readIDs == [first.id])
+}

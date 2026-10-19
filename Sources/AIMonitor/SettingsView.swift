@@ -94,7 +94,8 @@ struct SettingsView: View {
                 Spacer()
                 Button("Quit QuotaBar for AI") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
             }
-            if let error = renameError ?? store.storageError ?? loginError { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+            if let error = store.storageError { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+            if let error = renameError ?? loginError { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
         }.padding(24).frame(width: 650, height: 690)
             .sheet(isPresented: $adding) { SetupView().environmentObject(store) }
             .sheet(item: $navigation.reconnecting) { account in SetupView(existing: account).environmentObject(store) }
@@ -112,6 +113,6 @@ struct SettingsView: View {
             .alert("Remove this account?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
                 Button("Remove", role: .destructive) { if let account = deleting { store.remove(account) }; deleting = nil }
                 Button("Cancel", role: .cancel) { deleting = nil }
-            } message: { Text("This removes the saved connection from QuotaBar for AI and Keychain. Your subscription stays active.") }
+            } message: { Text("This stops monitoring the account and deletes its saved credential if Keychain allows it. Any cleanup failure will be shown. Your subscription stays active.") }
     }
 }

@@ -40,7 +40,10 @@ struct Keychain: CredentialVault {
         if status != errSecItemNotFound { try check(status) }
     }
     private func check(_ status: OSStatus) throws {
-        guard status == errSecSuccess else { throw MonitorError.message("Keychain access failed, code \(status). Unlock your Mac and try again.") }
+        guard status == errSecSuccess else {
+            let detail = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown Keychain error."
+            throw MonitorError.message("Keychain error \(status): \(detail)")
+        }
     }
 }
 
@@ -140,12 +143,27 @@ struct Keychain: CredentialVault {
         accounts = updated
     }
     func remove(_ account: Account) {
+        guard !demo, accounts.contains(where: { $0.id == account.id }) else { return }
         do {
             let updated = accounts.filter { $0.id != account.id }
-            try vault.remove(account.id)
+            // Stop monitoring durably before attempting credential cleanup.
             try persist(updated)
+            revisions[account.id] = nil
             accounts = updated; snapshots[account.id] = nil; errors[account.id] = nil
             reconnectRequired.remove(account.id)
+            accountAttempts[account.id] = nil
+            deferredUntil[account.id] = nil
+            pendingNetworkRefresh.remove(account.id)
+            networkRetryAfter[account.id] = nil
+            menuAccountChoices?[account.id.uuidString] = nil
+            menuAccountPrefixes[account.id.uuidString] = nil
+            defaults.set(menuAccountChoices, forKey: "menuAccountChoices")
+            defaults.set(menuAccountPrefixes, forKey: "menuAccountPrefixes")
+            storageError = nil
+            do { try vault.remove(account.id) }
+            catch {
+                storageError = "Account removed. Its saved credential could not be deleted. In Keychain Access, find com.local.ai-monitor.credentials with account \(account.id.uuidString) to remove it. \(error.localizedDescription)"
+            }
         } catch { storageError = error.localizedDescription }
     }
     func moveAccount(_ account: Account, by offset: Int) throws {
@@ -208,6 +226,7 @@ struct Keychain: CredentialVault {
         }.min() ?? 60
     }
     private func refreshAccount(_ account: Account, respectCooldown: Bool) async {
+        guard accounts.contains(where: { $0.id == account.id }) else { return }
         guard networkAvailable else {
             pendingNetworkRefresh.insert(account.id)
             return
@@ -221,7 +240,7 @@ struct Keychain: CredentialVault {
         accountAttempts[account.id] = date
         inFlight.insert(account.id)
         defer {
-            if Task.isCancelled { accountAttempts[account.id] = previousAttempt }
+            if Task.isCancelled, accounts.contains(where: { $0.id == account.id }) { accountAttempts[account.id] = previousAttempt }
             inFlight.remove(account.id)
         }
         let revision = revisions[account.id]
