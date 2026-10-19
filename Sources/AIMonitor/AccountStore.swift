@@ -9,9 +9,10 @@ import MonitorCore
     func remove(_ id: UUID) throws
 }
 struct Keychain: CredentialVault {
+    var service = "com.srizon.quotabar.credentials"
     private func query(_ id: UUID) -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: "com.local.ai-monitor.credentials",
+         kSecAttrService as String: service,
          kSecAttrAccount as String: id.uuidString]
     }
     func save(_ credential: Credential, id: UUID) throws {
@@ -30,9 +31,9 @@ struct Keychain: CredentialVault {
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        if status == errSecItemNotFound { throw MonitorError.authenticationRequired("Credentials not found. Reconnect this account.") }
+        if status == errSecItemNotFound { throw CredentialLookupError.notFound }
         try check(status)
-        guard let data = result as? Data else { throw MonitorError.authenticationRequired("Credentials not found. Reconnect this account.") }
+        guard let data = result as? Data else { throw MonitorError.invalidPayload }
         return try JSONDecoder().decode(Credential.self, from: data)
     }
     func remove(_ id: UUID) throws {
@@ -40,6 +41,7 @@ struct Keychain: CredentialVault {
         if status != errSecItemNotFound { try check(status) }
     }
     private func check(_ status: OSStatus) throws {
+        if status == errSecUserCanceled || status == errSecAuthFailed { throw CredentialLookupError.accessDenied }
         guard status == errSecSuccess else {
             let detail = SecCopyErrorMessageString(status, nil) as String? ?? "Unknown Keychain error."
             throw MonitorError.message("Keychain error \(status): \(detail)")
@@ -71,7 +73,7 @@ struct Keychain: CredentialVault {
 
     private let now: () -> Date
     private let file: URL
-    init(file: URL? = nil, client: UsageClient = UsageClient(), vault: any CredentialVault = Keychain(), now: @escaping () -> Date = Date.init, defaults: UserDefaults = .standard) {
+    init(file: URL? = nil, client: UsageClient = UsageClient(), vault: any CredentialVault = MigratingCredentialVault(), now: @escaping () -> Date = Date.init, defaults: UserDefaults = .standard) {
         self.client = client; self.vault = vault; self.now = now
         self.defaults = defaults
         menuAccountChoices = defaults.dictionary(forKey: "menuAccountChoices") as? [String: Bool]
@@ -162,7 +164,7 @@ struct Keychain: CredentialVault {
             storageError = nil
             do { try vault.remove(account.id) }
             catch {
-                storageError = "Account removed. Its saved credential could not be deleted. In Keychain Access, find com.local.ai-monitor.credentials with account \(account.id.uuidString) to remove it. \(error.localizedDescription)"
+                storageError = "Account removed. Its saved credential could not be deleted. In Keychain Access, find com.srizon.quotabar.credentials or com.local.ai-monitor.credentials with account \(account.id.uuidString) to remove it. \(error.localizedDescription)"
             }
         } catch { storageError = error.localizedDescription }
     }

@@ -6,12 +6,14 @@ Primary category: Utilities
 Secondary category: Productivity
 Primary language: English (U.S.)
 Price: Free
-Registered App Store bundle ID: com.afzalh.aimonitor
-Version: 1.0.0, build 15
+Target App Store bundle ID: com.srizon.quotabar
+Version: 1.0.0, build 20
 Support URL: https://github.com/AfzalH/ai-monitor/issues
 Marketing URL: https://github.com/AfzalH/ai-monitor
 Privacy policy URL: https://www.srizon.com/privacy
 Keywords: quota,usage,AI,subscription,monitor,menu bar,limits,reset,productivity
+
+The rejected record uses com.afzalh.aimonitor. A new App Store record is required for the new bundle ID.
 
 ## Promotional text
 

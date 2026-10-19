@@ -2,7 +2,12 @@ import SwiftUI
 import AppKit
 
 @MainActor final class ApplicationDelegate: NSObject, NSApplicationDelegate {
-    let store = AccountStore()
+    let store: AccountStore
+    override init() {
+        IdentityMigration.prepare()
+        store = AccountStore()
+        super.init()
+    }
     private var statusBar: StatusBarController?
     func applicationWillTerminate(_ notification: Notification) { statusBar?.shutdown() }
     func applicationDidFinishLaunching(_ notification: Notification) {

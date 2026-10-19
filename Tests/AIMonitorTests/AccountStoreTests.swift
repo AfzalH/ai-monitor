@@ -618,7 +618,7 @@ private actor AuthenticationFailureTransport: UsageTransport {
 
 @Test @MainActor func missingKeychainItemRequiresReconnect() throws {
     do {
-        _ = try Keychain().read(UUID())
+        _ = try MigratingCredentialVault().read(UUID())
         Issue.record("Unexpected credential for a new account ID")
     } catch MonitorError.authenticationRequired { }
     catch { Issue.record("Missing credential did not offer reconnect: \(error.localizedDescription)") }

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		05252E73ED7B42450A514FB3 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33325CBE4368B27120020FC3 /* App.swift */; };
 		0D9AF48F4D4BDA6618C6975B /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110D27C580CD2FCB4A9BCAB6 /* StatusBarController.swift */; };
+		13A2B1838093BE4223684C77 /* IdentityMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42782F62E0842F3E85CC0BA5 /* IdentityMigration.swift */; };
 		210C92BE1BC23E377B09F9B2 /* MenuBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 157A34216DA101D2BC27B39F /* MenuBarIcon.swift */; };
 		412293BC5721A6627FAE909F /* BrowserLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B3442181ACD8B83F400D3DF /* BrowserLogin.swift */; };
 		4B0ABDE6E93A920E498D33CF /* UsageParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D068D2F95DB10F6C0CD45074 /* UsageParser.swift */; };
@@ -47,6 +48,7 @@
 		157A34216DA101D2BC27B39F /* MenuBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIcon.swift; sourceTree = "<group>"; };
 		33325CBE4368B27120020FC3 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		3883A134814F4A66122AD0A9 /* libMonitorCore.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libMonitorCore.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		42782F62E0842F3E85CC0BA5 /* IdentityMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IdentityMigration.swift; sourceTree = "<group>"; };
 		537B0B343E8062C954E78C26 /* UsageThrottling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageThrottling.swift; sourceTree = "<group>"; };
 		66D4BD686CFD59DDD68537E2 /* PopoverPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverPresentation.swift; sourceTree = "<group>"; };
 		785125756FB6EDAE77D65294 /* PreviewRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewRenderer.swift; sourceTree = "<group>"; };
@@ -118,6 +120,7 @@
 				33325CBE4368B27120020FC3 /* App.swift */,
 				9B3442181ACD8B83F400D3DF /* BrowserLogin.swift */,
 				9DF1B9964432C8CA3919FC7E /* DashboardView.swift */,
+				42782F62E0842F3E85CC0BA5 /* IdentityMigration.swift */,
 				157A34216DA101D2BC27B39F /* MenuBarIcon.swift */,
 				051449B8D76722596BF6D0A1 /* MenuBarRefreshScheduler.swift */,
 				98D31D8F8CDE00104E1D7022 /* OAuthCallbackServer.swift */,
@@ -251,6 +254,7 @@
 				05252E73ED7B42450A514FB3 /* App.swift in Sources */,
 				412293BC5721A6627FAE909F /* BrowserLogin.swift in Sources */,
 				7CAE19B8CCF2B283C1E3A88C /* DashboardView.swift in Sources */,
+				13A2B1838093BE4223684C77 /* IdentityMigration.swift in Sources */,
 				210C92BE1BC23E377B09F9B2 /* MenuBarIcon.swift in Sources */,
 				A5972A006A33310EBE32C185 /* MenuBarRefreshScheduler.swift in Sources */,
 				FE261D8820E7607CC151E0BB /* OAuthCallbackServer.swift in Sources */,
@@ -302,7 +306,7 @@
 					"$(inherited)",
 					"-ObjC",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.afzalh.aimonitor;
+				PRODUCT_BUNDLE_IDENTIFIER = com.srizon.quotabar;
 				PRODUCT_MODULE_NAME = AIMonitor;
 				PRODUCT_NAME = "QuotaBar for AI";
 				SDKROOT = macosx;
@@ -347,7 +351,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 8TWJM99T9H;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -416,7 +420,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 15;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 8TWJM99T9H;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -452,7 +456,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.afzalh.aimonitor.core;
+				PRODUCT_BUNDLE_IDENTIFIER = com.srizon.quotabar.core;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -467,7 +471,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.afzalh.aimonitor.core;
+				PRODUCT_BUNDLE_IDENTIFIER = com.srizon.quotabar.core;
 				SDKROOT = macosx;
 				SKIP_INSTALL = YES;
 			};
@@ -489,7 +493,7 @@
 					"$(inherited)",
 					"-ObjC",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.afzalh.aimonitor;
+				PRODUCT_BUNDLE_IDENTIFIER = com.srizon.quotabar;
 				PRODUCT_MODULE_NAME = AIMonitor;
 				PRODUCT_NAME = "QuotaBar for AI";
 				SDKROOT = macosx;

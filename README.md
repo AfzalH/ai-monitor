@@ -14,7 +14,9 @@ Previously named AI Monitor. The current GitHub release, v0.1.12, still uses tha
 
 Requires macOS 14 or later. The app supports Apple Silicon and Intel Macs and is signed with Developer ID and notarized by Apple. Enable **Launch at login** in Settings if you want it to start automatically.
 
-See [GitHub Releases](https://github.com/AfzalH/ai-monitor/releases) for release notes and SHA-256 checksums. To update, quit AI Monitor and replace the app in Applications. Your saved accounts remain in Keychain and Application Support.
+When upgrading from the old bundle ID, remove its login item in System Settings and enable launch at login again for the updated app.
+
+See [GitHub Releases](https://github.com/AfzalH/ai-monitor/releases) for release notes and SHA-256 checksums. To update, quit QuotaBar for AI and replace the app in Applications. Your saved accounts remain in Keychain and Application Support.
 
 ## Screenshots
 
@@ -57,7 +59,7 @@ Access tokens and cookies expire. Use **Reconnect** when prompted. Use **Rename*
 
 ## Local data
 
-Credentials live in macOS Keychain under `com.local.ai-monitor.credentials`, with a different entry per account. Account names, provider names, and UUIDs live in `~/Library/Application Support/AI Monitor/accounts.json`. Usage snapshots remain in memory. Removing an account removes its Keychain entry and metadata.
+Credentials live in macOS Keychain under `com.srizon.quotabar.credentials`, with a different entry per account. Account names, provider names, and UUIDs live in `~/Library/Application Support/AI Monitor/accounts.json`. Upgrades from the old app copy readable credentials from `com.local.ai-monitor.credentials` and retain the original entries. Usage snapshots remain in memory. Removing an account removes its Keychain entry and metadata.
 
 Requests go directly to the selected provider. There is no backend, analytics, or credential logging. HTTP redirects are rejected for authenticated usage requests. No paid inference requests are used to measure usage. The app displays banked resets but never redeems them.
 

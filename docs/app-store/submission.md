@@ -8,7 +8,9 @@ Alternatively, run `./scripts/build-app-store.sh` after configuring signing. Pas
 
 The sandbox allows outgoing provider requests, a temporary incoming loopback listener for sign-in, and read-only access to user-selected authentication files. Direct automatic CLI-file import is omitted from this build. Users can choose the file explicitly instead.
 
-The App Store bundle uses `com.afzalh.aimonitor`, separate from the GitHub app's `com.local.ai-monitor`. Its sandbox data and credentials must be verified with a clean test account. Do not promise automatic migration from the GitHub app.
+Both build variants now target `com.srizon.quotabar`, with Keychain service `com.srizon.quotabar.credentials`. The rejected App Store record uses `com.afzalh.aimonitor` and cannot accept builds with the new ID. Register the new ID and create a new App Store record before uploading.
+
+The Developer ID app imports known preferences from `com.local.ai-monitor` once and retains its existing account-list location. When a credential is first read, it copies a readable legacy Keychain entry into the new service without deleting the original. If macOS denies access, reconnect that account. The App Store sandbox cannot automatically import the old app's container or the Developer ID app's files; verify it with a clean test account. The new App Store record also needs its own signing and Xcode Cloud setup. Launch-at-login registration does not transfer between bundle IDs. Remove the old login item and enable it again for the updated app.
 
 ## Submission prerequisites
 

@@ -10,7 +10,7 @@ settings:
     CODE_SIGN_STYLE: Automatic
     ENABLE_HARDENED_RUNTIME: YES
     MARKETING_VERSION: '1.0.0'
-    CURRENT_PROJECT_VERSION: '15'
+    CURRENT_PROJECT_VERSION: '20'
     ARCHS: 'arm64 x86_64'
     ONLY_ACTIVE_ARCH: NO
 targets:
@@ -21,7 +21,7 @@ targets:
       - ../Sources/MonitorCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.afzalh.aimonitor.core
+        PRODUCT_BUNDLE_IDENTIFIER: com.srizon.quotabar.core
         SKIP_INSTALL: YES
         DEFINES_MODULE: YES
   AIMonitor:
@@ -39,7 +39,7 @@ targets:
       base:
         PRODUCT_NAME: QuotaBar for AI
         PRODUCT_MODULE_NAME: AIMonitor
-        PRODUCT_BUNDLE_IDENTIFIER: com.afzalh.aimonitor
+        PRODUCT_BUNDLE_IDENTIFIER: com.srizon.quotabar
         CODE_SIGN_ENTITLEMENTS: AIMonitor.entitlements
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -26,12 +26,12 @@ cat > "$app_path/Contents/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>AIMonitor</string>
-<key>CFBundleIdentifier</key><string>com.local.ai-monitor</string>
+<key>CFBundleIdentifier</key><string>com.srizon.quotabar</string>
 <key>CFBundleName</key><string>QuotaBar for AI</string>
 <key>CFBundleDisplayName</key><string>QuotaBar for AI</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
-<key>CFBundleVersion</key><string>19</string>
-<key>CFBundleShortVersionString</key><string>0.1.18</string>
+<key>CFBundleVersion</key><string>20</string>
+<key>CFBundleShortVersionString</key><string>0.1.19</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
