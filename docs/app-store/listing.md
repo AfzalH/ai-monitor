@@ -1,4 +1,4 @@
-# App Store listing draft
+# App Store listing
 
 Name: QuotaBar for AI
 Subtitle: AI subscription quota tracker
@@ -13,7 +13,7 @@ Marketing URL: https://github.com/AfzalH/ai-monitor
 Privacy policy URL: https://www.srizon.com/privacy
 Keywords: quota,usage,AI,subscription,monitor,menu bar,limits,reset,productivity
 
-The rejected record uses com.afzalh.aimonitor. A new App Store record is required for the new bundle ID.
+App Store record: 6824478425. The old rejected record, 6824230786, uses com.afzalh.aimonitor and is named QuotaBar for AI Legacy.
 
 ## Promotional text
 
@@ -35,18 +35,16 @@ An existing provider account is required for live usage. QuotaBar for AI does no
 
 QuotaBar for AI is an independent utility and is not affiliated with or endorsed by the supported providers.
 
-## Review notes draft
+## Review notes background
+
+Include the loopback-listener explanation and reviewer steps from [the rejection response](rejection-2026-10-19.md).
 
 This is a menu-bar-only utility. Click its gauge icon after launch. Settings contains account setup and Quit.
 
-The empty state offers sample data for viewing the interface without credentials. Live verification requires a supported provider account. Confirm Apple's requirements for review access before submission; do not assume sample mode alone is sufficient.
+The empty state offers sample data for viewing the interface without credentials. Live verification requires a supported provider account. The submitted review notes describe both sample mode and live account setup. Apple has not yet accepted this review access.
 
-OAuth compatibility integrations use the public Claude Code and Codex client identifiers with PKCE and temporary loopback callbacks. Usage routes are mostly undocumented. Claude sign-in currently requests user:profile and user:inference. Codex requests openid, profile, email, and offline_access, but the app only retains the access token and reconnects when it expires. No inference calls, purchases, or banked-reset redemption are performed. These scopes have not yet been reduced and validated. Third-party authorization under guideline 5.2.2 remains to be confirmed before submission.
+OAuth compatibility integrations use the public Claude Code and Codex client identifiers with PKCE and temporary loopback callbacks. Usage routes are mostly undocumented. Claude sign-in currently requests user:profile and user:inference. Codex requests openid, profile, email, and offline_access, but the app only retains the access token and reconnects when it expires. No inference calls, purchases, or banked-reset redemption are performed. These scopes have not yet been reduced and validated. The owner chose to submit with the existing integrations. Provider permission requests were not sent; Apple has not yet reviewed this replacement submission.
 
-## Owner input still needed
+## Submission status
 
-- Confirm legal seller identity and public availability territories.
-- Supply App Review contact details through App Store Connect, not public repository files.
-- Confirm provider authorization and any required documentation.
-- Complete Apple's age-rating, content-rights, export-compliance, and trader-status declarations accurately.
-- Provide review access acceptable to Apple.
+Version 1.0.0, build 20 was submitted on October 19, 2026 and is waiting for review. Contact details were entered privately in App Store Connect. Privacy and age-rating answers are saved, and the owner completed the content-rights declaration. See [submission details](submission.md) for the recorded state.

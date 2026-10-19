@@ -4,13 +4,13 @@ A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and Open
 
 ## Install
 
-[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.12/AI-Monitor-0.1.12.zip)
+[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.19/QuotaBar-for-AI-0.1.19.zip)
 
-Previously named AI Monitor. The current GitHub release, v0.1.12, still uses that name for its ZIP and app bundle. The Mac App Store version is named QuotaBar for AI and is awaiting Apple review.
+Previously named AI Monitor. The current GitHub release is v0.1.19, build 20. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
 
-1. Download and unzip **AI-Monitor-0.1.12.zip**.
-2. Drag **AI Monitor.app** into **Applications**.
-3. Open **AI Monitor** and click the gauge icon in the menu bar to add your accounts.
+1. Download and unzip **QuotaBar-for-AI-0.1.19.zip**.
+2. Drag **QuotaBar for AI.app** into **Applications**.
+3. Open **QuotaBar for AI** and click the gauge icon in the menu bar to add your accounts.
 
 Requires macOS 14 or later. The app supports Apple Silicon and Intel Macs and is signed with Developer ID and notarized by Apple. Enable **Launch at login** in Settings if you want it to start automatically.
 
