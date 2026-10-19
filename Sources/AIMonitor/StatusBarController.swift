@@ -24,7 +24,7 @@ import Combine
             button.imagePosition = .imageLeading
             button.target = self
             button.action = #selector(toggle)
-            button.setAccessibilityLabel("AI Monitor")
+            button.setAccessibilityLabel("QuotaBar for AI")
         }
         updateTitle()
         menuMonitor = MenuBarRefreshScheduler(store: store)
@@ -129,7 +129,7 @@ import Combine
         if settingsWindow == nil {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 650, height: 690),
                                   styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "AI Monitor Settings"
+            window.title = "QuotaBar for AI Settings"
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: SettingsView().environmentObject(store))
             window.center()

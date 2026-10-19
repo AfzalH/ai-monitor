@@ -88,7 +88,7 @@ struct SettingsView: View {
             HStack {
                 Link("Privacy policy", destination: URL(string: "https://www.srizon.com/privacy")!)
                 Spacer()
-                Button("Quit AI Monitor") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
+                Button("Quit QuotaBar for AI") { NSApp.terminate(nil) }.buttonStyle(.plain).foregroundStyle(.secondary)
             }
             if let error = renameError ?? store.storageError ?? loginError { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
         }.padding(24).frame(width: 650, height: 690)
@@ -108,6 +108,6 @@ struct SettingsView: View {
             .alert("Remove this account?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } })) {
                 Button("Remove", role: .destructive) { if let account = deleting { store.remove(account) }; deleting = nil }
                 Button("Cancel", role: .cancel) { deleting = nil }
-            } message: { Text("This removes the saved connection from AI Monitor and Keychain. Your subscription stays active.") }
+            } message: { Text("This removes the saved connection from QuotaBar for AI and Keychain. Your subscription stays active.") }
     }
 }

@@ -22,10 +22,10 @@ cat > "$app_path/Contents/Info.plist" <<'PLIST'
 <plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>AIMonitor</string>
 <key>CFBundleIdentifier</key><string>com.local.ai-monitor</string>
-<key>CFBundleName</key><string>AI Monitor</string>
-<key>CFBundleDisplayName</key><string>AI Monitor</string>
-<key>CFBundleVersion</key><string>14</string>
-<key>CFBundleShortVersionString</key><string>0.1.13</string>
+<key>CFBundleName</key><string>QuotaBar for AI</string>
+<key>CFBundleDisplayName</key><string>QuotaBar for AI</string>
+<key>CFBundleVersion</key><string>15</string>
+<key>CFBundleShortVersionString</key><string>0.1.14</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>

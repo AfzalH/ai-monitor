@@ -81,10 +81,10 @@ import MonitorCore
                 self.claimed = true
                 self.listener?.cancel()
                 self.listener = nil
-                return (200, "Authorization received. Return to AI Monitor to finish connecting.", .success(code))
+                return (200, "Authorization received. Return to QuotaBar for AI to finish connecting.", .success(code))
             } catch let error as OAuthCallbackError {
                 self.claimed = true; self.listener?.cancel(); self.listener = nil
-                return (200, "Sign-in was declined. Return to AI Monitor to try again.", .failure(error))
+                return (200, "Sign-in was declined. Return to QuotaBar for AI to try again.", .failure(error))
             } catch { return (400, "This callback does not match the active sign-in.", nil) }
         }, complete: { [weak self] outcome in
             if let outcome { self?.finish(outcome) }
@@ -131,7 +131,7 @@ import MonitorCore
         }
     }
     private func reply(_ response: Reply) {
-        let body = "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'><title>AI Monitor</title></head><body style='font:18px system-ui;max-width:560px;margin:80px auto;padding:24px'><h1>AI Monitor</h1><p>\(response.message)</p><p>You can close this tab.</p></body></html>"
+        let body = "<!doctype html><html><head><meta name=viewport content='width=device-width,initial-scale=1'><title>QuotaBar for AI</title></head><body style='font:18px system-ui;max-width:560px;margin:80px auto;padding:24px'><h1>QuotaBar for AI</h1><p>\(response.message)</p><p>You can close this tab.</p></body></html>"
         let header = "HTTP/1.1 \(response.status) \(response.status == 200 ? "OK" : "Bad Request")\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'; style-src 'unsafe-inline'\r\nConnection: close\r\n\r\n"
         connection.send(content: Data((header + body).utf8), completion: .contentProcessed { [weak self] _ in
             Task { @MainActor in self?.close(response.result) }
