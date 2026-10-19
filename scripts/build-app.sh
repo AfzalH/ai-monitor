@@ -10,7 +10,12 @@ for arch in "${architectures[@]}"; do
   binaries+=("$binary_dir/AIMonitor")
 done
 app_path="$PWD/dist/AI Monitor.app"
-mkdir -p "$app_path/Contents/MacOS"
+mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
+# Package the same artwork used by the App Store build for Finder and Launchpad.
+iconset="$PWD/.build/QuotaBar.iconset"
+mkdir -p "$iconset"
+cp AppStore/Assets.xcassets/AppIcon.appiconset/*.png "$iconset/"
+iconutil -c icns "$iconset" -o "$app_path/Contents/Resources/AppIcon.icns"
 if [[ ${#binaries[@]} -eq 1 ]]; then
   cp "${binaries[0]}" "$app_path/Contents/MacOS/AIMonitor"
 else
@@ -24,8 +29,9 @@ cat > "$app_path/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>com.local.ai-monitor</string>
 <key>CFBundleName</key><string>QuotaBar for AI</string>
 <key>CFBundleDisplayName</key><string>QuotaBar for AI</string>
-<key>CFBundleVersion</key><string>17</string>
-<key>CFBundleShortVersionString</key><string>0.1.16</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundleVersion</key><string>18</string>
+<key>CFBundleShortVersionString</key><string>0.1.17</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
