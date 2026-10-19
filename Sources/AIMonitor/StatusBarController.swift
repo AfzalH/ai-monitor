@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import MonitorCore
 
 /// Explicit status-item placement avoids MenuBarExtra's fixed edge alignment.
 @MainActor final class StatusBarController: NSObject {
@@ -8,6 +9,7 @@ import Combine
     private let item: NSStatusItem
     private var panel: QuotaPanel?
     private var settingsWindow: NSWindow?
+    let settingsNavigation = SettingsNavigation()
     private var subscription: AnyCancellable?
     private var menuMonitor: MenuBarRefreshScheduler?
     private var localMonitor: Any?
@@ -57,6 +59,7 @@ import Combine
         self.panel = panel
         let dashboard = DashboardView(screenHeight: screen.visibleFrame.height,
                                       settingsAction: { [weak self] in self?.openSettings() },
+                                      reconnectAction: { [weak self] account in self?.reconnect(account) },
                                       heightChanged: { [weak self, weak panel] height in
             Task { @MainActor in
                 guard let self, let panel, self.panel === panel else { return }
@@ -124,6 +127,11 @@ import Combine
         menuMonitor = nil
         NSStatusBar.system.removeStatusItem(item)
     }
+    func reconnect(_ account: Account) {
+        guard !store.demo, let current = store.accounts.first(where: { $0.id == account.id }) else { return }
+        openSettings()
+        settingsNavigation.reconnecting = current
+    }
     private func openSettings() {
         close()
         if settingsWindow == nil {
@@ -131,7 +139,7 @@ import Combine
                                   styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
             window.title = "QuotaBar for AI Settings"
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: SettingsView().environmentObject(store))
+            window.contentView = NSHostingView(rootView: SettingsView(navigation: settingsNavigation).environmentObject(store))
             window.center()
             settingsWindow = window
         }

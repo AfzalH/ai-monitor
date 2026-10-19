@@ -22,6 +22,7 @@ struct DashboardView: View {
     @AppStorage("popoverHeightPercent") private var heightPercent = 40.0
     var screenHeight: CGFloat = NSScreen.main?.visibleFrame.height ?? 900
     var settingsAction: (() -> Void)?
+    var reconnectAction: ((Account) -> Void)?
     var heightChanged: ((CGFloat) -> Void)?
     @State private var contentHeight: CGFloat = 0
     private var popoverHeight: CGFloat {
@@ -45,7 +46,7 @@ struct DashboardView: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         ForEach(store.accounts) { account in
-                            AccountCard(account: account, snapshot: store.snapshots[account.id], error: store.errors[account.id], remaining: showRemaining)
+                            AccountCard(account: account, snapshot: store.snapshots[account.id], error: store.errors[account.id], remaining: showRemaining, reconnectAction: !store.demo && store.reconnectRequired.contains(account.id) ? reconnectAction.map { action in { action(account) } } : nil)
                         }
                     }.padding(10).fixedSize(horizontal: false, vertical: true)
                         .background(GeometryReader { geometry in
@@ -86,6 +87,7 @@ struct AccountCard: View {
     let snapshot: UsageSnapshot?
     let error: String?
     let remaining: Bool
+    var reconnectAction: (() -> Void)?
     @State private var expanded = false
 
     var body: some View {
@@ -131,7 +133,15 @@ struct AccountCard: View {
                     HStack { ProgressView().controlSize(.small); Text("Loading usage…").font(.caption).foregroundStyle(.secondary) }
                 }
                 if let error {
-                    Label(error, systemImage: "exclamationmark.triangle").font(.system(size: 10)).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                        if let reconnectAction {
+                            Button("Reconnect", action: reconnectAction)
+                                .buttonStyle(.bordered).controlSize(.small).fixedSize()
+                                .accessibilityLabel("Reconnect \(account.name)")
+                        }
+                    }.font(.system(size: 10))
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
         }

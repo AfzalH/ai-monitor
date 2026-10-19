@@ -30,8 +30,8 @@ public struct UsageSnapshot: Sendable {
     }
 }
 public enum MonitorError: LocalizedError {
-    case invalidPayload, message(String)
+    case invalidPayload, message(String), authenticationRequired(String)
     public var errorDescription: String? {
-        switch self { case .invalidPayload: "The provider returned an unrecognized usage response."; case .message(let text): text }
+        switch self { case .invalidPayload: "The provider returned an unrecognized usage response."; case .message(let text), .authenticationRequired(let text): text }
     }
 }

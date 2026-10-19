@@ -29,8 +29,10 @@ struct Keychain: CredentialVault {
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
-        try check(SecItemCopyMatching(query as CFDictionary, &result))
-        guard let data = result as? Data else { throw MonitorError.message("Credentials not found. Reconnect this account.") }
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { throw MonitorError.authenticationRequired("Credentials not found. Reconnect this account.") }
+        try check(status)
+        guard let data = result as? Data else { throw MonitorError.authenticationRequired("Credentials not found. Reconnect this account.") }
         return try JSONDecoder().decode(Credential.self, from: data)
     }
     func remove(_ id: UUID) throws {
@@ -47,6 +49,7 @@ struct Keychain: CredentialVault {
     @Published private(set) var snapshots: [UUID: UsageSnapshot] = [:]
     @Published private(set) var errors: [UUID: String] = [:]
     @Published private(set) var refreshing = false
+    @Published private(set) var reconnectRequired: Set<UUID> = []
     @Published var storageError: String?
     @Published var demo = false
     @Published private var menuAccountChoices: [String: Bool]?
@@ -118,6 +121,7 @@ struct Keychain: CredentialVault {
         try persist(updated)
         revisions[account.id] = UUID()
         accounts = updated; snapshots[account.id] = snapshot; errors[account.id] = nil
+        reconnectRequired.remove(account.id)
         if menuAccountChoices == nil { setMenuEnabled(account, true) }
     }
     func verifyAndSave(account: Account, credential: Credential) async throws {
@@ -141,6 +145,7 @@ struct Keychain: CredentialVault {
             try vault.remove(account.id)
             try persist(updated)
             accounts = updated; snapshots[account.id] = nil; errors[account.id] = nil
+            reconnectRequired.remove(account.id)
         } catch { storageError = error.localizedDescription }
     }
     func moveAccount(_ account: Account, by offset: Int) throws {
@@ -226,6 +231,7 @@ struct Keychain: CredentialVault {
             try Task.checkCancellation()
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             snapshots[account.id] = result; errors[account.id] = nil
+            reconnectRequired.remove(account.id)
             deferredUntil[account.id] = nil
             pendingNetworkRefresh.remove(account.id)
             networkRetryAfter[account.id] = nil
@@ -249,6 +255,9 @@ struct Keychain: CredentialVault {
         } catch {
             if !Task.isCancelled, revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo {
                 pendingNetworkRefresh.remove(account.id)
+                if case .authenticationRequired = error as? MonitorError {
+                    reconnectRequired.insert(account.id)
+                } else { reconnectRequired.remove(account.id) }
                 errors[account.id] = error.localizedDescription
             }
         }

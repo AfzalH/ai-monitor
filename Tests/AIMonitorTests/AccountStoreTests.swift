@@ -574,3 +574,52 @@ private actor WaitingClaudeTransport: UsageTransport {
     #expect(store.errors[account.id] == nil)
     #expect(await transport.calls == 1)
 }
+
+private actor AuthenticationFailureTransport: UsageTransport {
+    var fail = true
+    func get(_ request: URLRequest) async throws -> Data {
+        if fail { throw MonitorError.authenticationRequired("Sign-in expired. Reconnect this account.") }
+        return Data(#"{"five_hour":{"utilization":8}}"#.utf8)
+    }
+    func recover() { fail = false }
+}
+@Test @MainActor func reconnectActionTracksAuthenticationFailureAndClearsAfterRecovery() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let transport = AuthenticationFailureTransport()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Expired", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    await store.refresh()
+    #expect(store.reconnectRequired.contains(account.id))
+    await transport.recover()
+    await store.refresh()
+    #expect(!store.reconnectRequired.contains(account.id))
+    #expect(store.errors[account.id] == nil)
+}
+
+@Test @MainActor func reconnectFromPopoverOpensSettingsForTheSelectedAccount() async throws {
+    _ = NSApplication.shared
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: CountingTransport()), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Second Claude", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "fixture"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    store.setMenuEnabled(account, false)
+    let controller = StatusBarController(store: store)
+    defer { controller.shutdown() }
+    controller.reconnect(account)
+    #expect(controller.settingsNavigation.reconnecting?.id == account.id)
+    for _ in 0..<50 where !NSApp.windows.contains(where: { $0.title == "QuotaBar for AI Settings" && $0.attachedSheet != nil }) {
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(NSApp.windows.contains { $0.title == "QuotaBar for AI Settings" && $0.isVisible && $0.attachedSheet != nil })
+}
+
+@Test @MainActor func missingKeychainItemRequiresReconnect() throws {
+    do {
+        _ = try Keychain().read(UUID())
+        Issue.record("Unexpected credential for a new account ID")
+    } catch MonitorError.authenticationRequired { }
+    catch { Issue.record("Missing credential did not offer reconnect: \(error.localizedDescription)") }
+}

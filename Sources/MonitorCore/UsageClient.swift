@@ -24,8 +24,8 @@ public final class NetworkTransport: UsageTransport, Sendable {
         guard let http = response as? HTTPURLResponse else { throw MonitorError.invalidPayload }
         switch http.statusCode {
         case 200..<300: return data
-        case 401: throw MonitorError.message("Sign-in expired. Reconnect this account.")
-        case 403: throw MonitorError.message("Access denied. Reconnect or check this account's permissions.")
+        case 401: throw MonitorError.authenticationRequired("Sign-in expired. Reconnect this account.")
+        case 403: throw MonitorError.authenticationRequired("Access denied. Reconnect or check this account's permissions.")
         case 429: throw HTTPRateLimitError(retryAt: HTTPRateLimitError.retryDate(http.value(forHTTPHeaderField: "Retry-After")))
         default: throw MonitorError.message("The provider returned HTTP \(http.statusCode). Try again later.")
         }

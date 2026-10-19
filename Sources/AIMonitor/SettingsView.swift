@@ -2,7 +2,12 @@ import SwiftUI
 import ServiceManagement
 import MonitorCore
 
+@MainActor final class SettingsNavigation: ObservableObject {
+    @Published var reconnecting: Account?
+}
+
 struct SettingsView: View {
+    @ObservedObject var navigation: SettingsNavigation
     @EnvironmentObject var store: AccountStore
     @AppStorage("showRemaining") private var showRemaining = false
     @AppStorage("popoverHeightPercent") private var heightPercent = 40.0
@@ -10,7 +15,6 @@ struct SettingsView: View {
     @State private var newName = ""
     @State private var renameError: String?
     @State private var adding = false
-    @State private var reconnecting: Account?
     @State private var deleting: Account?
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
@@ -60,7 +64,7 @@ struct SettingsView: View {
                         }
                         Spacer()
                         Button("Rename") { renameError = nil; newName = account.name; renaming = account } .disabled(store.demo)
-                        Button("Reconnect") { reconnecting = account }.disabled(store.demo)
+                        Button("Reconnect") { navigation.reconnecting = account }.disabled(store.demo)
                         Button { deleting = account } label: { Image(systemName: "trash") }.help("Remove account").disabled(store.demo)
                     }.padding(.vertical, 6)
                 }.listStyle(.inset).clipShape(RoundedRectangle(cornerRadius: 8))
@@ -93,7 +97,7 @@ struct SettingsView: View {
             if let error = renameError ?? store.storageError ?? loginError { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
         }.padding(24).frame(width: 650, height: 690)
             .sheet(isPresented: $adding) { SetupView().environmentObject(store) }
-            .sheet(item: $reconnecting) { account in SetupView(existing: account).environmentObject(store) }
+            .sheet(item: $navigation.reconnecting) { account in SetupView(existing: account).environmentObject(store) }
             .alert("Rename account", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
                 TextField("Account name", text: $newName)
                 Button("Save") {
