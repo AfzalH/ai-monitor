@@ -37,9 +37,50 @@ private func attempt(_ provider: Provider = .claude) throws -> OAuthAttempt {
     #expect(body.contains("code=code%2Bwith%26symbols"))
     #expect(body.contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A1455%2Fauth%2Fcallback"))
 }
-@Test func oauthTokenResponseDoesNotPersistRefreshToken() throws {
-    let credential = try attempt().credential(from: Data(#"{"access_token":"test-access","refresh_token":"do-not-persist","token_type":"Bearer"}"#.utf8))
+@Test func oauthTokenResponseKeepsRenewalDetails() throws {
+    let now = Date()
+    let credential = try attempt().credential(from: Data(#"{"access_token":"test-access","refresh_token":"test-refresh","expires_in":28800,"token_type":"Bearer"}"#.utf8), now: now)
     #expect(credential.secret == "test-access")
     #expect(credential.kind == .bearer)
-    #expect(!String(decoding: try JSONEncoder().encode(credential), as: UTF8.self).contains("do-not-persist"))
+    #expect(credential.refreshToken == "test-refresh")
+    #expect(credential.expiresAt == now.addingTimeInterval(28800))
+    #expect(!credential.needsRenewal(at: now.addingTimeInterval(28700)))
+    #expect(credential.needsRenewal(at: now.addingTimeInterval(28740)))
+}
+@Test func renewalRequestsMatchProviderCLIs() throws {
+    for (provider, host, scope) in [(Provider.claude, "platform.claude.com", "user:profile user:inference"), (.codex, "auth.openai.com", "openid profile email")] {
+        let request = try OAuthAttempt.renewalRequest(provider: provider, refreshToken: "test-refresh")
+        let data = try #require(request.httpBody)
+        let body = try #require(try JSONSerialization.jsonObject(with: data) as? [String: String])
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.host == host)
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        #expect(body["grant_type"] == "refresh_token")
+        #expect(body["refresh_token"] == "test-refresh")
+        #expect(body["scope"] == scope)
+        #expect(body["client_id"]?.isEmpty == false)
+    }
+}
+private actor TokenEndpoint: UsageTransport {
+    let response: Data?
+    init(_ response: Data?) { self.response = response }
+    func get(_ request: URLRequest) async throws -> Data {
+        guard let response else { throw HTTPStatusError(status: 400) }
+        return response
+    }
+}
+@Test func renewalKeepsDetailsTheProviderOmits() async throws {
+    let previous = Credential(kind: .bearer, secret: "old", scope: "account-b", refreshToken: "test-refresh", expiresAt: Date())
+    let renewed = try await UsageClient(transport: TokenEndpoint(Data(#"{"access_token":"new"}"#.utf8))).renew(provider: .codex, credential: previous)
+    #expect(renewed.secret == "new")
+    #expect(renewed.refreshToken == "test-refresh")
+    #expect(renewed.scope == "account-b")
+    #expect(renewed.expiresAt == nil)
+}
+@Test func rejectedRenewalAsksToReconnect() async throws {
+    let previous = Credential(kind: .bearer, secret: "old", refreshToken: "revoked")
+    do { _ = try await UsageClient(transport: TokenEndpoint(nil)).renew(provider: .claude, credential: previous); Issue.record("Expected rejection") }
+    catch MonitorError.authenticationRequired {}
+    do { _ = try await UsageClient(transport: TokenEndpoint(nil)).renew(provider: .claude, credential: Credential(kind: .bearer, secret: "pasted")); Issue.record("Expected reconnect") }
+    catch MonitorError.authenticationRequired {}
 }

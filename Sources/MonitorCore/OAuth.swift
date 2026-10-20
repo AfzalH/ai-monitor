@@ -18,8 +18,12 @@ public struct OAuthAttempt: Sendable {
         guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { throw MonitorError.message("Could not create a secure sign-in request.") }
         return Data(bytes).base64URLEncoded
     }
-    private var clientID: String {
+    private var clientID: String { Self.clientID(provider) }
+    private static func clientID(_ provider: Provider) -> String {
         provider == .claude ? "9d1c250a-e61b-44d9-88ed-5944d1962f5e" : "app_EMoamEEZ73f0CkXaXp7hrann"
+    }
+    private static func tokenURL(_ provider: Provider) -> URL {
+        URL(string: provider == .claude ? "https://platform.claude.com/v1/oauth/token" : "https://auth.openai.com/oauth/token")!
     }
     public var authorizationURL: URL {
         var url = URLComponents(string: provider == .claude ? "https://claude.com/cai/oauth/authorize" : "https://auth.openai.com/oauth/authorize")!
@@ -47,7 +51,7 @@ public struct OAuthAttempt: Sendable {
         return code
     }
     public func tokenRequest(code: String) throws -> URLRequest {
-        var request = URLRequest(url: URL(string: provider == .claude ? "https://platform.claude.com/v1/oauth/token" : "https://auth.openai.com/oauth/token")!)
+        var request = URLRequest(url: Self.tokenURL(provider))
         request.httpMethod = "POST"; request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         var values = ["grant_type": "authorization_code", "code": code, "client_id": clientID,
@@ -65,9 +69,29 @@ public struct OAuthAttempt: Sendable {
         }
         return request
     }
-    public func credential(from data: Data) throws -> Credential {
+    /// Matches the refresh requests made by Claude Code and the Codex CLI.
+    public static func renewalRequest(provider: Provider, refreshToken: String) throws -> URLRequest {
+        guard provider != .opencode else { throw MonitorError.invalidPayload }
+        var request = URLRequest(url: tokenURL(provider))
+        request.httpMethod = "POST"; request.timeoutInterval = 30
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "grant_type": "refresh_token", "refresh_token": refreshToken, "client_id": clientID(provider),
+            "scope": provider == .claude ? "user:profile user:inference" : "openid profile email"
+        ])
+        return request
+    }
+    public func credential(from data: Data, now: Date = Date()) throws -> Credential {
+        try Self.credential(provider: provider, from: data, now: now)
+    }
+    /// Providers may omit a rotated refresh token or the account scope on
+    /// renewal, so those fall back to the previous credential.
+    public static func credential(provider: Provider, from data: Data, now: Date = Date(), previous: Credential? = nil) throws -> Credential {
         let root = try UsageParser.object(data)
         guard let token = root["access_token"] as? String, !token.isEmpty else { throw MonitorError.invalidPayload }
+        let refresh = (root["refresh_token"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? previous?.refreshToken
+        let expiresAt = UsageParser.number(root["expires_in"]).flatMap { $0 > 0 ? now.addingTimeInterval($0) : nil }
         var scope: String?
         if provider == .codex {
             for jwt in [root["id_token"] as? String, token].compactMap({ $0 }) {
@@ -80,7 +104,7 @@ public struct OAuthAttempt: Sendable {
                    let id = auth["chatgpt_account_id"] as? String, !id.isEmpty { scope = id; break }
             }
         }
-        return Credential(kind: .bearer, secret: token, scope: scope)
+        return Credential(kind: .bearer, secret: token, scope: scope ?? previous?.scope, refreshToken: refresh, expiresAt: expiresAt)
     }
 }
 private extension Data {

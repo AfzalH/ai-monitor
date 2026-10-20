@@ -227,6 +227,15 @@ struct Keychain: CredentialVault {
             return min(60, max(1, 60 - now().timeIntervalSince(attempt)))
         }.min() ?? 60
     }
+    /// The provider may invalidate the previous refresh token as soon as it
+    /// responds, so the result is saved before any cancellation check.
+    private func renew(_ account: Account, _ credential: Credential, revision: UUID?) async throws -> Credential {
+        let renewed = try await client.renew(provider: account.provider, credential: credential, now: now())
+        // A reconnect during renewal wins. Never overwrite its credential.
+        guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { throw CancellationError() }
+        try vault.save(renewed, id: account.id)
+        return renewed
+    }
     private func refreshAccount(_ account: Account, respectCooldown: Bool) async {
         guard accounts.contains(where: { $0.id == account.id }) else { return }
         guard networkAvailable else {
@@ -247,8 +256,19 @@ struct Keychain: CredentialVault {
         }
         let revision = revisions[account.id]
         do {
-            let credential = try vault.read(account.id)
-            let result = try await client.fetch(provider: account.provider, credential: credential, accountID: account.id)
+            var credential = try vault.read(account.id)
+            var renewed = false
+            if credential.needsRenewal(at: now()) {
+                credential = try await renew(account, credential, revision: revision)
+                renewed = true
+            }
+            let result: UsageSnapshot
+            do { result = try await client.fetch(provider: account.provider, credential: credential, accountID: account.id) }
+            catch MonitorError.authenticationRequired(_) where !renewed && credential.refreshToken != nil {
+                // Tokens can expire early or without a known expiry. Renew once and retry.
+                credential = try await renew(account, credential, revision: revision)
+                result = try await client.fetch(provider: account.provider, credential: credential, accountID: account.id)
+            }
             try Task.checkCancellation()
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             snapshots[account.id] = result; errors[account.id] = nil
@@ -259,7 +279,9 @@ struct Keychain: CredentialVault {
         } catch let deferred as UsageRefreshDeferred {
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             deferredUntil[account.id] = deferred.until
-            if deferred.rateLimited || snapshots[account.id] == nil {
+            // Spacing is not a failure. Keep a real error, such as an expired
+            // sign-in, visible instead of replacing it with the spacing notice.
+            if deferred.rateLimited || (snapshots[account.id] == nil && errors[account.id] == nil) {
                 reconnectRequired.remove(account.id)
                 errors[account.id] = deferred.localizedDescription
             }

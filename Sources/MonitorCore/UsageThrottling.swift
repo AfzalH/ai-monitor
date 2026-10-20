@@ -57,7 +57,10 @@ public actor ClaudeUsageThrottle {
         let keys = [key] + (accountID.map { ["account:" + $0.uuidString] } ?? [])
         let previousEntries = Dictionary(uniqueKeysWithValues: keys.compactMap { key in entries[key].map { (key, $0) } })
         let previous = keys.compactMap { entries[$0] }.max { $0.failures < $1.failures }
-        if let entry = keys.compactMap({ entries[$0] }).filter({ $0.until > now }).max(by: { $0.until < $1.until }) {
+        // A new credential, such as after reconnecting, skips the routine
+        // spacing left by the old one but still honors provider throttling.
+        let gates = keys.compactMap { gateKey in entries[gateKey].flatMap { gateKey == key || $0.rateLimited ? $0 : nil } }
+        if let entry = gates.filter({ $0.until > now }).max(by: { $0.until < $1.until }) {
             throw UsageRefreshDeferred(until: entry.until, rateLimited: entry.rateLimited)
         }
         if keys.contains(where: { inFlight.contains($0) }) {
@@ -75,10 +78,16 @@ public actor ClaudeUsageThrottle {
         } catch let error as HTTPRateLimitError {
             let failures = min(3, (previous?.failures ?? 0) + 1)
             let delay = 900 * pow(2, Double(failures - 1))
-            let until = max(now.addingTimeInterval(delay), error.retryAt?.addingTimeInterval(1) ?? now)
+            let until = max(now.addingTimeInterval(delay), error.retryAt?.addingTimeInterval(120) ?? now)
             for key in keys { entries[key] = Entry(until: until, failures: failures, rateLimited: true) }
             persist()
             throw UsageRefreshDeferred(until: until, rateLimited: true)
+        } catch where error is MonitorError || error is HTTPStatusError {
+            // The provider answered without throttling, so earlier 429s no
+            // longer count toward the backoff. Keep the five-minute spacing.
+            for key in keys { entries[key]?.failures = 0 }
+            persist()
+            throw error
         } catch let error as URLError where error.code == .notConnectedToInternet {
             // No connection was made. Restore the previous gate, including its
             // failure count, so reconnecting does not incur a fresh cooldown.

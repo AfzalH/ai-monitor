@@ -87,7 +87,7 @@ struct SettingsView: View {
                     loginError = nil
                 } catch { loginError = error.localizedDescription }
             }
-            Text("Opening refreshes at most once per minute. Refresh respects provider cooldowns. Reconnect when a session expires.")
+            Text("Opening refreshes at most once per minute. Refresh respects provider cooldowns. Browser sign-ins renew automatically. Reconnect if renewal fails.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Link("Privacy policy", destination: URL(string: "https://www.srizon.com/privacy")!)

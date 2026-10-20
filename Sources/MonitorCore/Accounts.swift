@@ -4,7 +4,17 @@ public struct Credential: Codable, Sendable {
     public var kind: AuthKind
     public var secret: String
     public var scope: String?
-    public init(kind: AuthKind, secret: String, scope: String? = nil) { self.kind = kind; self.secret = secret; self.scope = scope }
+    /// Present only for the app's own browser sign-ins. Imported CLI files never
+    /// supply one, because renewing would rotate the CLI's token and sign it out.
+    public var refreshToken: String?
+    public var expiresAt: Date?
+    public init(kind: AuthKind, secret: String, scope: String? = nil, refreshToken: String? = nil, expiresAt: Date? = nil) {
+        self.kind = kind; self.secret = secret; self.scope = scope; self.refreshToken = refreshToken; self.expiresAt = expiresAt
+    }
+    public func needsRenewal(at date: Date) -> Bool {
+        guard refreshToken != nil, let expiresAt else { return false }
+        return expiresAt <= date.addingTimeInterval(60)
+    }
     public static func codexFile(_ data: Data) throws -> Credential {
         let root = try UsageParser.object(data)
         guard let tokens = root["tokens"] as? [String: Any],

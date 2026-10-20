@@ -651,8 +651,14 @@ private actor AuthThenTemporaryFailure: UsageTransport {
     await store.refresh()
     #expect(store.reconnectRequired.contains(account.id))
     await store.refresh()
-    #expect(store.errors[account.id] != nil)
-    #expect(!store.reconnectRequired.contains(account.id))
+    if kind == 0 {
+        // Five-minute spacing must not hide the expired sign-in or its reconnect action.
+        #expect(store.errors[account.id] == "Sign-in expired. Reconnect this account.")
+        #expect(store.reconnectRequired.contains(account.id))
+    } else {
+        #expect(store.errors[account.id] != nil)
+        #expect(!store.reconnectRequired.contains(account.id))
+    }
 }
 
 @MainActor private final class RemovalFailureVault: CredentialVault {
@@ -722,4 +728,88 @@ private actor AuthThenTemporaryFailure: UsageTransport {
     await transport.release()
     await refresh.value
     #expect(vault.readIDs == [first.id])
+}
+
+private actor RenewalTransport: UsageTransport {
+    private let renewal: Data?
+    private let expired: Set<String>
+    private let holdRenewal: Bool
+    private var held: CheckedContinuation<Void, Never>?
+    private var heldWaiter: CheckedContinuation<Void, Never>?
+    private(set) var renewals = 0
+    private(set) var usageTokens: [String] = []
+    init(renewal: Data?, expired: Set<String> = [], holdRenewal: Bool = false) {
+        self.renewal = renewal; self.expired = expired; self.holdRenewal = holdRenewal
+    }
+    func get(_ request: URLRequest) async throws -> Data {
+        if request.httpMethod == "POST" {
+            renewals += 1
+            if holdRenewal {
+                await withCheckedContinuation { held = $0; heldWaiter?.resume(); heldWaiter = nil }
+            }
+            guard let renewal else { throw HTTPStatusError(status: 400) }
+            return renewal
+        }
+        let token = request.value(forHTTPHeaderField: "Authorization") ?? ""
+        usageTokens.append(token)
+        if expired.contains(token) { throw MonitorError.authenticationRequired("Sign-in expired. Reconnect this account.") }
+        return Data(#"{"five_hour":{"utilization":5}}"#.utf8)
+    }
+    func waitForRenewal() async {
+        if held != nil { return }
+        await withCheckedContinuation { heldWaiter = $0 }
+    }
+    func release() { held?.resume(); held = nil }
+}
+@MainActor private func renewalStore(_ transport: RenewalTransport, credential: Credential) throws -> (AccountStore, MemoryVault, Account, String) {
+    let suite = UUID().uuidString
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let vault = MemoryVault()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: vault, defaults: UserDefaults(suiteName: suite)!)
+    let account = Account(name: "Claude", provider: .claude)
+    try store.save(account: account, credential: credential, snapshot: UsageSnapshot(plan: "Max", windows: []))
+    return (store, vault, account, suite)
+}
+@Test @MainActor func expiringSignInRenewsBeforeCheckingUsage() async throws {
+    let transport = RenewalTransport(renewal: Data(#"{"access_token":"new","refresh_token":"rotated","expires_in":28800}"#.utf8))
+    let (store, vault, account, suite) = try renewalStore(transport, credential: Credential(kind: .bearer, secret: "old", refreshToken: "first", expiresAt: Date().addingTimeInterval(-10)))
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    await store.refresh()
+    #expect(await transport.usageTokens == ["Bearer new"])
+    #expect(vault.values[account.id]?.secret == "new")
+    #expect(vault.values[account.id]?.refreshToken == "rotated")
+    #expect(store.errors[account.id] == nil)
+}
+@Test @MainActor func rejectedTokenRenewsOnceAndRetriesThroughClaudeSpacing() async throws {
+    let transport = RenewalTransport(renewal: Data(#"{"access_token":"new"}"#.utf8), expired: ["Bearer old"])
+    let (store, vault, account, suite) = try renewalStore(transport, credential: Credential(kind: .bearer, secret: "old", refreshToken: "first"))
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    await store.refresh()
+    #expect(await transport.usageTokens == ["Bearer old", "Bearer new"])
+    #expect(await transport.renewals == 1)
+    #expect(vault.values[account.id]?.refreshToken == "first")
+    #expect(store.errors[account.id] == nil)
+    #expect(!store.reconnectRequired.contains(account.id))
+}
+@Test @MainActor func rejectedRenewalShowsReconnect() async throws {
+    let transport = RenewalTransport(renewal: nil, expired: ["Bearer old"])
+    let (store, _, account, suite) = try renewalStore(transport, credential: Credential(kind: .bearer, secret: "old", refreshToken: "revoked"))
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    await store.refresh()
+    #expect(await transport.renewals == 1)
+    #expect(store.reconnectRequired.contains(account.id))
+    #expect(store.errors[account.id] == "Sign-in expired. Reconnect this account.")
+}
+@Test @MainActor func reconnectDuringRenewalKeepsTheNewSignIn() async throws {
+    let transport = RenewalTransport(renewal: Data(#"{"access_token":"renewed","refresh_token":"rotated"}"#.utf8), holdRenewal: true)
+    let (store, vault, account, suite) = try renewalStore(transport, credential: Credential(kind: .bearer, secret: "old", refreshToken: "first", expiresAt: Date().addingTimeInterval(-10)))
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let refresh = Task { await store.refresh() }
+    await transport.waitForRenewal()
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "reconnected", refreshToken: "fresh"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    await transport.release()
+    await refresh.value
+    #expect(vault.values[account.id]?.secret == "reconnected")
+    #expect(await transport.usageTokens.isEmpty)
+    #expect(store.errors[account.id] == nil)
 }

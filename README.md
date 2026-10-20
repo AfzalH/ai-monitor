@@ -4,11 +4,11 @@ A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and Open
 
 ## Install
 
-[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.19/QuotaBar-for-AI-0.1.19.zip)
+[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.20/QuotaBar-for-AI-0.1.20.zip)
 
-Previously named AI Monitor. The current GitHub release is v0.1.19, build 20. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
+Previously named AI Monitor. The current GitHub release is v0.1.20, build 21. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
 
-1. Download and unzip **QuotaBar-for-AI-0.1.19.zip**.
+1. Download and unzip **QuotaBar-for-AI-0.1.20.zip**.
 2. Drag **QuotaBar for AI.app** into **Applications**.
 3. Open **QuotaBar for AI** and click the gauge icon in the menu bar to add your accounts.
 
@@ -40,7 +40,7 @@ Expand an account to see additional limits, such as OpenCode Go's monthly quota.
 
 ```sh
 ./scripts/build-app.sh
-open "dist/AI Monitor.app"
+open "dist/QuotaBar for AI.app"
 ```
 
 Click the gauge icon in the menu bar, then **Add your first account**. The gear opens account management. You can move the app to Applications after building. Enable launch at login from its settings after moving it.
@@ -55,7 +55,7 @@ The menu bar can show several accounts, including multiple accounts from the sam
 
 Add each subscription separately and give it a name. Claude and Codex browser sign-ins use separate authorization requests. Your default browser may already have a provider session, so select or switch to the intended account on the provider page when adding a backup. You can connect the same provider more than once.
 
-Access tokens and cookies expire. Use **Reconnect** when prompted. Use **Rename** to change a saved account name without signing in again. This version does not refresh OAuth tokens automatically. Imported CLI credentials are snapshots; the app never modifies the original auth file or redeems its refresh token. No embedded browser is used. Claude opens your default browser and returns through a temporary localhost callback. Codex uses loopback port 1455, falling back to 1457 if occupied. Each callback requires the matching state and PKCE verifier. Sign-in times out after ten minutes and cancellation closes the listener. OpenCode has no automatic external-browser session transfer in this version.
+Claude and Codex browser sign-ins renew their access tokens automatically. The app stores the refresh token in Keychain with the access token and renews shortly before expiry or after the provider rejects the token. Pasted access tokens, imported CLI credentials, and cookies cannot be renewed. Use **Reconnect** when prompted. Accounts connected before 0.1.20 have no refresh token, so reconnect them once. Use **Rename** to change a saved account name without signing in again. Imported CLI credentials are snapshots; the app never modifies the original auth file or redeems its refresh token, because doing so would sign the CLI out. No embedded browser is used. Claude opens your default browser and returns through a temporary localhost callback. Codex uses loopback port 1455, falling back to 1457 if occupied. Each callback requires the matching state and PKCE verifier. Sign-in times out after ten minutes and cancellation closes the listener. OpenCode has no automatic external-browser session transfer in this version.
 
 ## Local data
 
@@ -94,7 +94,7 @@ To notarize the signed app and produce a distributable ZIP:
 ./scripts/notarize.sh
 ```
 
-This uses the existing `vBoard-Notary` Keychain profile. Override it with `NOTARY_PROFILE` if needed. Credentials remain in Keychain. The script submits the ZIP to Apple, waits for acceptance, staples the ticket to the app, verifies Gatekeeper acceptance, and rebuilds the ZIP with the ticket included. Outputs are `dist/AI-Monitor-<version>.zip` and its SHA-256 checksum.
+This uses the existing `vBoard-Notary` Keychain profile. Override it with `NOTARY_PROFILE` if needed. Credentials remain in Keychain. The script submits the ZIP to Apple, waits for acceptance, staples the ticket to the app, verifies Gatekeeper acceptance, and rebuilds the ZIP with the ticket included. Outputs are `dist/QuotaBar-for-AI-<version>.zip` and its SHA-256 checksum.
 
 The submission ID is saved in `dist/notarization-submission.json`. If waiting times out, run `./scripts/notarize.sh SUBMISSION_ID` to resume without submitting again. Do not rebuild or modify the app between submission and stapling. A rebuild needs a new notarization submission.
 

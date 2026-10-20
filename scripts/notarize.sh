@@ -2,9 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 profile="${NOTARY_PROFILE:-vBoard-Notary}"
-app_path="$PWD/dist/AI Monitor.app"
+app_path="$PWD/dist/QuotaBar for AI.app"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_path/Contents/Info.plist")"
-archive="$PWD/dist/AI-Monitor-$version.zip"
+archive="$PWD/dist/QuotaBar-for-AI-$version.zip"
 submission="$PWD/dist/notarization-submission.json"
 status_file="$PWD/dist/notarization-status.json"
 
@@ -38,6 +38,6 @@ codesign --verify --deep --strict "$app_path"
 spctl --assess --type execute --verbose=2 "$app_path"
 # Recreate the distributable so it includes the stapled ticket for offline checks.
 ditto -c -k --keepParent "$app_path" "$archive"
-(cd dist && shasum -a 256 "$(basename "$archive")" > "AI-Monitor-$version.sha256")
+(cd dist && shasum -a 256 "$(basename "$archive")" > "QuotaBar-for-AI-$version.sha256")
 printf 'Signed, notarized, and stapled: %s\n' "$app_path"
 printf 'Distribution archive: %s\n' "$archive"

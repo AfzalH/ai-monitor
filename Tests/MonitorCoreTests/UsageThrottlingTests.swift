@@ -55,14 +55,14 @@ private func fixtureRequest(_ token: String = "fixture") -> URLRequest {
     let now = Date()
     let transport = ThrottleTransport(limited: true, retryAt: now.addingTimeInterval(1200))
     do { _ = try await gate.get(fixtureRequest(), using: transport, now: now); Issue.record("Expected throttling") }
-    catch let error as UsageRefreshDeferred { #expect(error.rateLimited); #expect(error.until == now.addingTimeInterval(1201)) }
+    catch let error as UsageRefreshDeferred { #expect(error.rateLimited); #expect(error.until == now.addingTimeInterval(1320)) }
     do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(900)); Issue.record("Retried too early") }
     catch is UsageRefreshDeferred {}
     #expect(await transport.calls == 1)
-    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(1201)); Issue.record("Expected throttling") }
-    catch let error as UsageRefreshDeferred { #expect(error.until == now.addingTimeInterval(3001)) }
-    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(3001)); Issue.record("Expected throttling") }
-    catch let error as UsageRefreshDeferred { #expect(error.until == now.addingTimeInterval(6601)) }
+    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(1320)); Issue.record("Expected throttling") }
+    catch let error as UsageRefreshDeferred { #expect(error.until == now.addingTimeInterval(3120)) }
+    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(3120)); Issue.record("Expected throttling") }
+    catch let error as UsageRefreshDeferred { #expect(error.until == now.addingTimeInterval(6720)) }
 }
 @Test func missingRetryAfterStillPausesFifteenMinutes() async throws {
     let suite = UUID().uuidString
@@ -126,4 +126,46 @@ private struct OfflineTransport: UsageTransport {
         #expect(deferred.until == now.addingTimeInterval(300))
         #expect(!deferred.rateLimited)
     }
+}
+
+private actor ScriptedTransport: UsageTransport {
+    private var outcomes: [Error?]
+    init(_ outcomes: [Error?]) { self.outcomes = outcomes }
+    func get(_ request: URLRequest) async throws -> Data {
+        if let error = outcomes.removeFirst() { throw error }
+        return Data("{}".utf8)
+    }
+}
+@Test func nonThrottledResponseClearsEarlierBackoff() async throws {
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let gate = ClaudeUsageThrottle(suiteName: suite)
+    let now = Date()
+    let transport = ScriptedTransport([HTTPRateLimitError(retryAt: nil), MonitorError.authenticationRequired("Sign-in expired. Reconnect this account."), HTTPRateLimitError(retryAt: nil)])
+    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now); Issue.record("Expected throttling") }
+    catch is UsageRefreshDeferred {}
+    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(900)); Issue.record("Expected sign-in error") }
+    catch MonitorError.authenticationRequired {}
+    // The sign-in error still keeps the usual five-minute spacing.
+    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(1000)); Issue.record("Retried too early") }
+    catch let error as UsageRefreshDeferred { #expect(!error.rateLimited) }
+    do { _ = try await gate.get(fixtureRequest(), using: transport, now: now.addingTimeInterval(1200)); Issue.record("Expected throttling") }
+    catch let error as UsageRefreshDeferred { #expect(error.until == now.addingTimeInterval(2100)) }
+}
+@Test func reconnectSkipsSpacingButNotThrottling() async throws {
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let gate = ClaudeUsageThrottle(suiteName: suite)
+    let now = Date()
+    let accountID = UUID()
+    let transport = ScriptedTransport([MonitorError.authenticationRequired("Sign-in expired. Reconnect this account."), nil, HTTPRateLimitError(retryAt: nil)])
+    do { _ = try await gate.get(fixtureRequest("expired"), using: transport, accountID: accountID, now: now); Issue.record("Expected sign-in error") }
+    catch MonitorError.authenticationRequired {}
+    do { _ = try await gate.get(fixtureRequest("expired"), using: transport, accountID: accountID, now: now.addingTimeInterval(10)); Issue.record("Retried too early") }
+    catch is UsageRefreshDeferred {}
+    _ = try await gate.get(fixtureRequest("renewed"), using: transport, accountID: accountID, now: now.addingTimeInterval(20))
+    do { _ = try await gate.get(fixtureRequest("renewed"), using: transport, accountID: accountID, now: now.addingTimeInterval(400)); Issue.record("Expected throttling") }
+    catch is UsageRefreshDeferred {}
+    do { _ = try await gate.get(fixtureRequest("another"), using: transport, accountID: accountID, now: now.addingTimeInterval(500)); Issue.record("Reconnect bypassed throttling") }
+    catch let error as UsageRefreshDeferred { #expect(error.rateLimited) }
 }

@@ -27,9 +27,14 @@ public final class NetworkTransport: UsageTransport, Sendable {
         case 401: throw MonitorError.authenticationRequired("Sign-in expired. Reconnect this account.")
         case 403: throw MonitorError.authenticationRequired("Access denied. Reconnect or check this account's permissions.")
         case 429: throw HTTPRateLimitError(retryAt: HTTPRateLimitError.retryDate(http.value(forHTTPHeaderField: "Retry-After")))
-        default: throw MonitorError.message("The provider returned HTTP \(http.statusCode). Try again later.")
+        default: throw HTTPStatusError(status: http.statusCode)
         }
     }
+}
+public struct HTTPStatusError: LocalizedError, Sendable {
+    public let status: Int
+    public init(status: Int) { self.status = status }
+    public var errorDescription: String? { "The provider returned HTTP \(status). Try again later." }
 }
 public struct UsageClient: Sendable {
     let transport: any UsageTransport
@@ -54,6 +59,16 @@ public struct UsageClient: Sendable {
             return try await claudeThrottle.get(request, using: transport, accountID: accountID)
         }
         return try await transport.get(request)
+    }
+    /// Exchanges the stored refresh token for a new access token. A rejected
+    /// grant means the user must sign in again.
+    public func renew(provider: Provider, credential: Credential, now: Date = Date()) async throws -> Credential {
+        let expired = MonitorError.authenticationRequired("Sign-in expired. Reconnect this account.")
+        guard credential.kind == .bearer, let refreshToken = credential.refreshToken else { throw expired }
+        do {
+            let data = try await transport.get(OAuthAttempt.renewalRequest(provider: provider, refreshToken: refreshToken))
+            return try OAuthAttempt.credential(provider: provider, from: data, now: now, previous: credential)
+        } catch let error as HTTPStatusError where error.status == 400 { throw expired }
     }
     public func workspaces(provider: Provider, credential: Credential) async throws -> [Workspace] {
         guard credential.kind == .cookie, provider != .codex else { return [] }
