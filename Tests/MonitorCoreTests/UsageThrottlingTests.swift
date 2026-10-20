@@ -169,3 +169,23 @@ private actor ScriptedTransport: UsageTransport {
     do { _ = try await gate.get(fixtureRequest("another"), using: transport, accountID: accountID, now: now.addingTimeInterval(500)); Issue.record("Reconnect bypassed throttling") }
     catch let error as UsageRefreshDeferred { #expect(error.rateLimited) }
 }
+@Test func userReconnectGetsOneRequestThroughAccountBackoff() async throws {
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let gate = ClaudeUsageThrottle(suiteName: suite)
+    let now = Date()
+    let accountID = UUID()
+    let transport = ScriptedTransport([HTTPRateLimitError(retryAt: nil), HTTPRateLimitError(retryAt: nil), nil])
+    do { _ = try await gate.get(fixtureRequest("old"), using: transport, accountID: accountID, now: now); Issue.record("Expected throttling") }
+    catch is UsageRefreshDeferred {}
+    // A renewed token in the background still waits for the backoff.
+    do { _ = try await gate.get(fixtureRequest("renewed"), using: transport, accountID: accountID, now: now.addingTimeInterval(60)); Issue.record("Renewal bypassed throttling") }
+    catch let error as UsageRefreshDeferred { #expect(error.rateLimited) }
+    // Reconnecting reaches the provider. Another 429 throttles again.
+    do { _ = try await gate.get(fixtureRequest("signed-in"), using: transport, accountID: accountID, reconnecting: true, now: now.addingTimeInterval(120)); Issue.record("Expected throttling") }
+    catch let error as UsageRefreshDeferred { #expect(error.rateLimited && error.until == now.addingTimeInterval(1920)) }
+    _ = try await gate.get(fixtureRequest("signed-in-again"), using: transport, accountID: accountID, reconnecting: true, now: now.addingTimeInterval(180))
+    // After a successful reconnect only the usual spacing applies.
+    do { _ = try await gate.get(fixtureRequest("signed-in-again"), using: transport, accountID: accountID, now: now.addingTimeInterval(240)); Issue.record("Retried too early") }
+    catch let error as UsageRefreshDeferred { #expect(!error.rateLimited && error.until == now.addingTimeInterval(480)) }
+}

@@ -43,7 +43,7 @@ public struct UsageClient: Sendable {
     public init(transport: any UsageTransport, claudeThrottle: ClaudeUsageThrottle? = nil) {
         self.transport = transport; self.claudeThrottle = claudeThrottle
     }
-    private func get(_ url: String, credential: Credential, provider: Provider, scope: Bool = true, accountID: UUID? = nil) async throws -> Data {
+    private func get(_ url: String, credential: Credential, provider: Provider, scope: Bool = true, accountID: UUID? = nil, reconnecting: Bool = false) async throws -> Data {
         var request = URLRequest(url: URL(string: url)!)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -56,7 +56,7 @@ public struct UsageClient: Sendable {
             if provider == .opencode { request.setValue(id, forHTTPHeaderField: "x-org-id") }
         }
         if provider == .claude, request.url?.path.hasSuffix("/usage") == true, let claudeThrottle {
-            return try await claudeThrottle.get(request, using: transport, accountID: accountID)
+            return try await claudeThrottle.get(request, using: transport, accountID: accountID, reconnecting: reconnecting)
         }
         return try await transport.get(request)
     }
@@ -80,7 +80,10 @@ public struct UsageClient: Sendable {
             return Workspace(id: id, name: row["name"] as? String ?? id)
         }
     }
-    public func fetch(provider: Provider, credential: Credential, accountID: UUID? = nil) async throws -> UsageSnapshot {
+    /// `reconnecting` marks a user-initiated sign-in. It may make one Claude
+    /// request through the account's earlier backoff, but never the new
+    /// credential's own.
+    public func fetch(provider: Provider, credential: Credential, accountID: UUID? = nil, reconnecting: Bool = false) async throws -> UsageSnapshot {
         switch provider {
         case .claude:
             let url: String
@@ -88,7 +91,7 @@ public struct UsageClient: Sendable {
                 guard let id = credential.scope, id.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil else { throw MonitorError.message("Select a Claude organization first.") }
                 url = "https://claude.ai/api/organizations/\(id)/usage"
             } else { url = "https://api.anthropic.com/api/oauth/usage" }
-            return try UsageParser.parse(await get(url, credential: credential, provider: provider, accountID: accountID), provider: provider)
+            return try UsageParser.parse(await get(url, credential: credential, provider: provider, accountID: accountID, reconnecting: reconnecting), provider: provider)
         case .codex:
             var result = try UsageParser.parse(await get("https://chatgpt.com/backend-api/wham/usage", credential: credential, provider: provider), provider: provider)
             do {

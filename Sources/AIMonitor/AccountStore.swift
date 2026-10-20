@@ -73,6 +73,9 @@ struct Keychain: CredentialVault {
 
     private let now: () -> Date
     private let file: URL
+    /// The last usage figures per account, so a relaunch shows them while the
+    /// provider's request spacing or backoff is still running.
+    private var snapshotFile: URL { file.deletingLastPathComponent().appendingPathComponent("snapshots.json") }
     init(file: URL? = nil, client: UsageClient = UsageClient(), vault: any CredentialVault = MigratingCredentialVault(), now: @escaping () -> Date = Date.init, defaults: UserDefaults = .standard) {
         self.client = client; self.vault = vault; self.now = now
         self.defaults = defaults
@@ -83,6 +86,9 @@ struct Keychain: CredentialVault {
         if FileManager.default.fileExists(atPath: self.file.path) {
             do { accounts = try JSONDecoder().decode([Account].self, from: Data(contentsOf: self.file)) }
             catch { storageError = "Could not load saved accounts. \(error.localizedDescription)" }
+        }
+        if let data = try? Data(contentsOf: snapshotFile), let saved = try? JSONDecoder().decode([String: UsageSnapshot].self, from: data) {
+            for account in accounts { snapshots[account.id] = saved[account.id.uuidString] }
         }
         if menuAccountChoices == nil, !accounts.isEmpty {
             let legacy = defaults.dictionary(forKey: "menuProviderChoices") as? [String: Bool]
@@ -117,6 +123,13 @@ struct Keychain: CredentialVault {
         try JSONEncoder().encode(accounts).write(to: file, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
     }
+    private func persistSnapshots() {
+        guard !demo else { return }
+        let saved = Dictionary(uniqueKeysWithValues: snapshots.map { ($0.key.uuidString, $0.value) })
+        guard let data = try? JSONEncoder().encode(saved) else { return }
+        try? data.write(to: snapshotFile, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: snapshotFile.path)
+    }
     func save(account: Account, credential: Credential, snapshot: UsageSnapshot) throws {
         guard !demo else { return }
         try vault.save(credential, id: account.id)
@@ -127,10 +140,15 @@ struct Keychain: CredentialVault {
         revisions[account.id] = UUID()
         accounts = updated; snapshots[account.id] = snapshot; errors[account.id] = nil
         reconnectRequired.remove(account.id)
+        // The new credential just answered. Waits left by the old one no longer apply.
+        deferredUntil[account.id] = nil
+        networkRetryAfter[account.id] = nil
+        pendingNetworkRefresh.remove(account.id)
+        persistSnapshots()
         if menuAccountChoices == nil { setMenuEnabled(account, true) }
     }
     func verifyAndSave(account: Account, credential: Credential) async throws {
-        let snapshot = try await client.fetch(provider: account.provider, credential: credential, accountID: account.id)
+        let snapshot = try await client.fetch(provider: account.provider, credential: credential, accountID: account.id, reconnecting: true)
         try Task.checkCancellation()
         try save(account: account, credential: credential, snapshot: snapshot)
     }
@@ -152,6 +170,7 @@ struct Keychain: CredentialVault {
             try persist(updated)
             revisions[account.id] = nil
             accounts = updated; snapshots[account.id] = nil; errors[account.id] = nil
+            persistSnapshots()
             reconnectRequired.remove(account.id)
             accountAttempts[account.id] = nil
             deferredUntil[account.id] = nil
@@ -272,6 +291,7 @@ struct Keychain: CredentialVault {
             try Task.checkCancellation()
             guard revisions[account.id] == revision, accounts.contains(where: { $0.id == account.id }), !demo else { return }
             snapshots[account.id] = result; errors[account.id] = nil
+            persistSnapshots()
             reconnectRequired.remove(account.id)
             deferredUntil[account.id] = nil
             pendingNetworkRefresh.remove(account.id)

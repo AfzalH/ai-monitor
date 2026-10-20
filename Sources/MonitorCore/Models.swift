@@ -4,7 +4,7 @@ public enum Provider: String, Codable, CaseIterable, Sendable {
     case claude, codex, opencode
     public var title: String { switch self { case .claude: "Claude"; case .codex: "Codex"; case .opencode: "OpenCode" } }
 }
-public struct QuotaWindow: Identifiable, Sendable {
+public struct QuotaWindow: Identifiable, Codable, Sendable {
     public var id: String { label }
     public let label: String
     public let used: Double
@@ -14,11 +14,11 @@ public struct QuotaWindow: Identifiable, Sendable {
         self.label = label; self.used = used; self.resetsAt = resetsAt
     }
 }
-public struct ResetCredits: Sendable {
+public struct ResetCredits: Codable, Sendable {
     public let available: Int
     public let expirations: [Date]
 }
-public struct UsageSnapshot: Sendable {
+public struct UsageSnapshot: Codable, Sendable {
     public var plan: String
     public var windows: [QuotaWindow]
     public var resets: ResetCredits?

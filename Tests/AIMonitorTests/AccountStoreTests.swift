@@ -813,3 +813,52 @@ private actor RenewalTransport: UsageTransport {
     #expect(await transport.usageTokens.isEmpty)
     #expect(store.errors[account.id] == nil)
 }
+
+private actor ThrottledUntilReconnect: UsageTransport {
+    var calls = 0
+    func get(_ request: URLRequest) async throws -> Data {
+        calls += 1
+        if request.value(forHTTPHeaderField: "Authorization") == "Bearer old" { throw HTTPRateLimitError(retryAt: nil) }
+        return Data(#"{"five_hour":{"utilization":5}}"#.utf8)
+    }
+}
+@Test @MainActor func reconnectDuringBackoffRestoresUsageAndRefreshSchedule() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let suite = UUID().uuidString
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let transport = ThrottledUntilReconnect()
+    let store = AccountStore(file: dir.appendingPathComponent("accounts.json"), client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: MemoryVault(), defaults: UserDefaults(suiteName: UUID().uuidString)!)
+    let account = Account(name: "Claude", provider: .claude)
+    try store.save(account: account, credential: Credential(kind: .bearer, secret: "old"), snapshot: UsageSnapshot(plan: "Max", windows: []))
+    await store.refresh()
+    #expect(store.errors[account.id]?.contains("Paused until") == true)
+    try await store.verifyAndSave(account: account, credential: Credential(kind: .bearer, secret: "new"))
+    #expect(await transport.calls == 2)
+    #expect(store.errors[account.id] == nil)
+    #expect(store.snapshots[account.id]?.windows.first?.used == 5)
+    // Background refresh follows the new sign-in, not the old token's backoff.
+    #expect(store.nextMenuRefreshDelay <= 60)
+}
+@Test @MainActor func lastUsageSurvivesRelaunchDuringSpacing() async throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let suite = UUID().uuidString
+    let defaults = UserDefaults(suiteName: suite)!
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let file = dir.appendingPathComponent("accounts.json")
+    let vault = MemoryVault()
+    let transport = CountingTransport()
+    let store = AccountStore(file: file, client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: vault, defaults: defaults)
+    let account = Account(name: "Claude", provider: .claude)
+    try await store.verifyAndSave(account: account, credential: Credential(kind: .bearer, secret: "fixture"))
+    let relaunched = AccountStore(file: file, client: UsageClient(transport: transport, claudeThrottle: ClaudeUsageThrottle(suiteName: suite)), vault: vault, defaults: defaults)
+    #expect(relaunched.snapshots[account.id]?.windows.first?.used == 5)
+    await relaunched.refresh()
+    #expect(await transport.calls == 1)
+    #expect(relaunched.errors[account.id] == nil)
+    #expect(relaunched.menuLabel == "95%")
+    relaunched.remove(account)
+    let saved = try String(contentsOf: dir.appendingPathComponent("snapshots.json"), encoding: .utf8)
+    #expect(!saved.contains(account.id.uuidString))
+}

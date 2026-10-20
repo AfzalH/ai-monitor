@@ -47,7 +47,7 @@ public actor ClaudeUsageThrottle {
     private func persist() {
         if let data = try? JSONEncoder().encode(entries) { defaults.set(data, forKey: "claudeUsageThrottle") }
     }
-    public func get(_ request: URLRequest, using transport: any UsageTransport, accountID: UUID? = nil, now: Date = Date()) async throws -> Data {
+    public func get(_ request: URLRequest, using transport: any UsageTransport, accountID: UUID? = nil, reconnecting: Bool = false, now: Date = Date()) async throws -> Data {
         let credential = request.value(forHTTPHeaderField: "Authorization") ?? request.value(forHTTPHeaderField: "Cookie") ?? "anonymous"
         // Browser organizations have separate usage windows. Keep duplicate entries
         // for the same credential + endpoint together, and preserve reconnect
@@ -57,9 +57,11 @@ public actor ClaudeUsageThrottle {
         let keys = [key] + (accountID.map { ["account:" + $0.uuidString] } ?? [])
         let previousEntries = Dictionary(uniqueKeysWithValues: keys.compactMap { key in entries[key].map { (key, $0) } })
         let previous = keys.compactMap { entries[$0] }.max { $0.failures < $1.failures }
-        // A new credential, such as after reconnecting, skips the routine
-        // spacing left by the old one but still honors provider throttling.
-        let gates = keys.compactMap { gateKey in entries[gateKey].flatMap { gateKey == key || $0.rateLimited ? $0 : nil } }
+        // A new credential, such as a renewed token, skips the routine spacing
+        // left by the old one but still honors provider throttling. A user's
+        // reconnect also gets one request through the account's backoff: the
+        // old token may be the one the provider throttled.
+        let gates = keys.compactMap { gateKey in entries[gateKey].flatMap { gateKey == key || (!reconnecting && $0.rateLimited) ? $0 : nil } }
         if let entry = gates.filter({ $0.until > now }).max(by: { $0.until < $1.until }) {
             throw UsageRefreshDeferred(until: entry.until, rateLimited: entry.rateLimited)
         }

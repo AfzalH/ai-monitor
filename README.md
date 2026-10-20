@@ -4,11 +4,11 @@ A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and Open
 
 ## Install
 
-[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.20/QuotaBar-for-AI-0.1.20.zip)
+[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.21/QuotaBar-for-AI-0.1.21.zip)
 
-Previously named AI Monitor. The current GitHub release is v0.1.20, build 21. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
+Previously named AI Monitor. The current GitHub release is v0.1.21, build 22. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
 
-1. Download and unzip **QuotaBar-for-AI-0.1.20.zip**.
+1. Download and unzip **QuotaBar-for-AI-0.1.21.zip**.
 2. Drag **QuotaBar for AI.app** into **Applications**.
 3. Open **QuotaBar for AI** and click the gauge icon in the menu bar to add your accounts.
 
@@ -59,7 +59,7 @@ Claude and Codex browser sign-ins renew their access tokens automatically. The a
 
 ## Local data
 
-Credentials live in macOS Keychain under `com.srizon.quotabar.credentials`, with a different entry per account. Account names, provider names, and UUIDs live in `~/Library/Application Support/AI Monitor/accounts.json`. Upgrades from the old app copy readable credentials from `com.local.ai-monitor.credentials` and retain the original entries. Usage snapshots remain in memory. Removing an account removes its Keychain entry and metadata.
+Credentials live in macOS Keychain under `com.srizon.quotabar.credentials`, with a different entry per account. Account names, provider names, and UUIDs live in `~/Library/Application Support/AI Monitor/accounts.json`. Upgrades from the old app copy readable credentials from `com.local.ai-monitor.credentials` and retain the original entries. The latest usage figures for each account are cached in `snapshots.json` in the same folder, so they appear immediately after a relaunch. Removing an account removes its Keychain entry and metadata.
 
 Requests go directly to the selected provider. There is no backend, analytics, or credential logging. HTTP redirects are rejected for authenticated usage requests. No paid inference requests are used to measure usage. The app displays banked resets but never redeems them.
 
@@ -102,6 +102,6 @@ Protocol research used the public [CodexBar provider documentation](https://gith
 
 ### Claude request throttling
 
-We could not find an official request budget for the subscription OAuth usage endpoint. The five-minute interval is this app's conservative policy, not a guaranteed provider limit. A 429 pauses Claude checks for at least 15 minutes, then 30 and 60 minutes on repeated throttling. A longer `Retry-After` value always wins. The pause is saved across restarts, keyed by the account ID and a digest of the credential plus usage URL. Reconnecting an existing account keeps its cooldown, and existing usage stays visible. Other apps and Claude Code sessions can still consume the same account's request budget.
+We could not find an official request budget for the subscription OAuth usage endpoint. The five-minute interval is this app's conservative policy, not a guaranteed provider limit. A 429 pauses Claude checks for at least 15 minutes, then 30 and 60 minutes on repeated throttling. A longer `Retry-After` value always wins. The pause is saved across restarts, keyed by the account ID and a digest of the credential plus usage URL. Background checks with a renewed token still wait out the pause. Reconnecting from Settings sends one request even during a pause, because the provider may have throttled only the old token. A 429 on that request starts a new pause. The last usage stays visible meanwhile, including after a relaunch. Other apps and Claude Code sessions can still consume the same account's request budget.
 
 References: [Anthropic rate-limit guidance](https://platform.claude.com/docs/en/api/rate-limits) and a [firsthand usage-endpoint throttling report](https://github.com/anthropics/claude-code/issues/77477). The published inference API rate tables are not a documented limit for the subscription usage endpoint.

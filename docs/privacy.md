@@ -6,7 +6,7 @@ AI Monitor, listed on the Mac App Store as QuotaBar for AI, is a macOS utility t
 
 ## Data on your Mac
 
-AI Monitor stores connected-account names, provider identifiers, and app preferences locally. Access tokens, refresh tokens from browser sign-in, API keys, and session cookies are stored in macOS Keychain. Refresh tokens are sent only to the provider that issued them, to renew access. Usage responses are held in memory. Local request-cooldown records contain account identifiers and cryptographic digests, not the original credentials.
+AI Monitor stores connected-account names, provider identifiers, and app preferences locally. Access tokens, refresh tokens from browser sign-in, API keys, and session cookies are stored in macOS Keychain. Refresh tokens are sent only to the provider that issued them, to renew access. The latest usage figures for each account, such as plan name, percentages, and reset times, are cached in a local file so they appear after a relaunch. Removing an account deletes its cached figures. Local request-cooldown records contain account identifiers and cryptographic digests, not the original credentials.
 
 The app does not send your account credentials or usage information to the developer. It has no developer-operated backend, advertising, analytics SDK, or tracking system.
 
