@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "9F5FE40126E1B3EEC9EA1307"
-               BuildableName = "QuotaBar for AI.app"
+               BuildableName = "AIMonitor.app"
                BlueprintName = "AIMonitor"
                ReferencedContainer = "container:AIMonitorAppStore.xcodeproj">
             </BuildableReference>
@@ -33,7 +33,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9F5FE40126E1B3EEC9EA1307"
-            BuildableName = "QuotaBar for AI.app"
+            BuildableName = "AIMonitor.app"
             BlueprintName = "AIMonitor"
             ReferencedContainer = "container:AIMonitorAppStore.xcodeproj">
          </BuildableReference>
@@ -58,7 +58,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9F5FE40126E1B3EEC9EA1307"
-            BuildableName = "QuotaBar for AI.app"
+            BuildableName = "AIMonitor.app"
             BlueprintName = "AIMonitor"
             ReferencedContainer = "container:AIMonitorAppStore.xcodeproj">
          </BuildableReference>
@@ -77,7 +77,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "9F5FE40126E1B3EEC9EA1307"
-            BuildableName = "QuotaBar for AI.app"
+            BuildableName = "AIMonitor.app"
             BlueprintName = "AIMonitor"
             ReferencedContainer = "container:AIMonitorAppStore.xcodeproj">
          </BuildableReference>
