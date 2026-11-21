@@ -53,3 +53,26 @@ private func data(_ text: String) -> Data { Data(text.utf8) }
     #expect(windows.first(where: { $0.label == "Scoped · Weekly" })?.used == 30)
     #expect(windows.filter { $0.label.contains("Opus") }.map(\.label) == ["Claude Opus 4 · Weekly"])
 }
+
+@Test func claudeParsesExtraUsageSpendAndLimit() throws {
+    let enabled = try UsageParser.parse(data(#"{"five_hour":{"utilization":10},"extra_usage":{"is_enabled":true,"monthly_limit":20000,"used_credits":200.0,"utilization":1.0,"currency":"eur"}}"#), provider: .claude)
+    let extra = try #require(enabled.extraUsage)
+    #expect(extra.used == 2.0)
+    #expect(extra.limit == 200.0)
+    #expect(extra.utilization == 1.0)
+    #expect(extra.percentUsed == 1.0)
+    #expect(extra.percentRemaining == 99.0)
+    #expect(extra.currency == "EUR")
+
+    let computed = try UsageParser.parse(data(#"{"five_hour":{"utilization":10},"extra_usage":{"is_enabled":true,"monthly_limit":20000,"used_credits":500,"utilization":null}}"#), provider: .claude)
+    #expect(computed.extraUsage?.percentUsed == 2.5)
+    #expect(computed.extraUsage?.currency == nil)
+
+    let uncapped = try UsageParser.parse(data(#"{"five_hour":{"utilization":10},"extra_usage":{"is_enabled":true,"monthly_limit":null,"used_credits":1234,"utilization":null,"currency":"USD"}}"#), provider: .claude)
+    #expect(uncapped.extraUsage?.used == 12.34)
+    #expect(uncapped.extraUsage?.limit == nil)
+    #expect(uncapped.extraUsage?.percentUsed == nil)
+
+    let disabled = try UsageParser.parse(data(#"{"five_hour":{"utilization":10},"extra_usage":{"is_enabled":false,"monthly_limit":20000,"used_credits":200,"utilization":1.0}}"#), provider: .claude)
+    #expect(disabled.extraUsage == nil)
+}

@@ -2,13 +2,22 @@ import AppKit
 import SwiftUI
 import MonitorCore
 
-/// Keep provider-wide limits first; scoped/model limits stay behind Show more.
+/// Keep provider-wide limits first and show up to three bars by default; additional limits stay behind Show more.
 enum CompactLimits {
+    static let defaultVisibleCount = 3
+
     static func primaryIndices(_ windows: [QuotaWindow]) -> [Int] {
-        let primary = ["5 hours", "Weekly"].compactMap { label in
-            windows.firstIndex { $0.label == label }
+        var indices: [Int] = []
+        for label in ["5 hours", "Weekly", "Monthly"] {
+            if let index = windows.firstIndex(where: { $0.label == label }), !indices.contains(index) {
+                indices.append(index)
+                if indices.count == defaultVisibleCount { return indices }
+            }
         }
-        // Providers with only another period still need a useful default row.
-        return primary.isEmpty ? Array(windows.indices.prefix(1)) : primary
+        for index in windows.indices where !indices.contains(index) {
+            indices.append(index)
+            if indices.count == defaultVisibleCount { break }
+        }
+        return indices
     }
 }

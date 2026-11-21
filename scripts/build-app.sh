@@ -7,7 +7,9 @@ binaries=()
 for arch in "${architectures[@]}"; do
   swift build -c release --arch "$arch"
   binary_dir="$(swift build -c release --arch "$arch" --show-bin-path)"
-  binaries+=("$binary_dir/AIMonitor")
+  staged="$PWD/.build/AIMonitor-$arch"
+  cp "$binary_dir/AIMonitor" "$staged"
+  binaries+=("$staged")
 done
 app_path="$PWD/dist/QuotaBar for AI.app"
 mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
@@ -30,8 +32,8 @@ cat > "$app_path/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>QuotaBar for AI</string>
 <key>CFBundleDisplayName</key><string>QuotaBar for AI</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
-<key>CFBundleVersion</key><string>22</string>
-<key>CFBundleShortVersionString</key><string>0.1.21</string>
+<key>CFBundleVersion</key><string>23</string>
+<key>CFBundleShortVersionString</key><string>0.1.22</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>

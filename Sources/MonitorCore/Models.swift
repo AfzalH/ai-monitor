@@ -18,15 +18,32 @@ public struct ResetCredits: Codable, Sendable {
     public let available: Int
     public let expirations: [Date]
 }
+public struct ExtraUsage: Codable, Equatable, Sendable {
+    public let used: Double?
+    public let limit: Double?
+    public let utilization: Double?
+    public let currency: String?
+    public let resetsAt: Date?
+    public init(used: Double? = nil, limit: Double? = nil, utilization: Double? = nil, currency: String? = nil, resetsAt: Date? = nil) {
+        self.used = used; self.limit = limit; self.utilization = utilization; self.currency = currency; self.resetsAt = resetsAt
+    }
+    public var percentUsed: Double? {
+        if let utilization { return utilization }
+        if let used, let limit, limit > 0 { return used / limit * 100 }
+        return nil
+    }
+    public var percentRemaining: Double? { percentUsed.map { max(0, 100 - $0) } }
+}
 public struct UsageSnapshot: Codable, Sendable {
     public var plan: String
     public var windows: [QuotaWindow]
     public var resets: ResetCredits?
+    public var extraUsage: ExtraUsage?
     public var note: String?
     public var balance: Double?
     public var fetchedAt = Date()
-    public init(plan: String, windows: [QuotaWindow], balance: Double? = nil) {
-        self.plan = plan; self.windows = windows; self.balance = balance
+    public init(plan: String, windows: [QuotaWindow], balance: Double? = nil, extraUsage: ExtraUsage? = nil) {
+        self.plan = plan; self.windows = windows; self.balance = balance; self.extraUsage = extraUsage
     }
 }
 public enum MonitorError: LocalizedError {

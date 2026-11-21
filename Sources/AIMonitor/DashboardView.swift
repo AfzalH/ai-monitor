@@ -117,6 +117,9 @@ struct AccountCard: View {
                         Button(expanded ? "Show less" : "Show more (\(snapshot.windows.count - primary.count))") { expanded.toggle() }
                             .buttonStyle(.plain).font(.system(size: 10)).foregroundStyle(account.provider.color)
                     }
+                    if let extraUsage = snapshot.extraUsage {
+                        ExtraUsageRow(extraUsage: extraUsage, remaining: remaining, tint: account.provider.color)
+                    }
                     if let balance = snapshot.balance {
                         Text("Balance: " + balance.formatted(.currency(code: "USD"))).font(.system(size: 10))
                     }
@@ -191,5 +194,48 @@ private struct QuotaRow: View {
         if minutes >= 1440 { return "\(minutes / 1440)d \((minutes % 1440) / 60)h remaining" }
         if minutes >= 60 { return "\(minutes / 60)h \(minutes % 60)m remaining" }
         return "\(minutes) min remaining"
+    }
+}
+private struct ExtraUsageRow: View {
+    let extraUsage: ExtraUsage
+    let remaining: Bool
+    let tint: Color
+    var body: some View {
+        if let percentUsed = extraUsage.percentUsed {
+            let displayed = remaining ? (extraUsage.percentRemaining ?? 0) : percentUsed
+            VStack(alignment: .leading, spacing: 5) {
+                Text(headerText)
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.85)
+                    .help(extraUsage.resetsAt?.formatted(date: .complete, time: .shortened) ?? headerText)
+                HStack(spacing: 8) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.primary.opacity(0.07))
+                            Capsule().fill(percentUsed >= 90 ? Color.orange : tint)
+                                .frame(width: geometry.size.width * min(100, max(0, displayed)) / 100)
+                        }
+                    }.frame(height: 6)
+                    Text(displayed.formatted(.number.precision(.fractionLength(0...1))) + (remaining ? "% left" : "% used"))
+                        .font(.system(size: 10, weight: .medium)).monospacedDigit().fixedSize().frame(width: 62, alignment: .trailing)
+                }.accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Extra usage, \(Int(displayed)) percent \(remaining ? "remaining" : "used")")
+            }
+        } else if let used = extraUsage.used {
+            Text("Extra usage: \(amount(used)) spent")
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+    }
+    private var headerText: String {
+        switch (extraUsage.used, extraUsage.limit) {
+        case let (used?, limit?): return "Extra Usage - \(amount(used)) / \(amount(limit))"
+        case let (nil, limit?): return "Extra Usage - limit \(amount(limit))"
+        case let (used?, nil): return "Extra Usage - \(amount(used)) spent"
+        case (nil, nil): return "Extra Usage"
+        }
+    }
+    private func amount(_ value: Double) -> String {
+        if let currency = extraUsage.currency { return value.formatted(.currency(code: currency)) }
+        return value.formatted(.number.precision(.fractionLength(2)))
     }
 }

@@ -28,10 +28,22 @@ public enum UsageParser {
         guard let row = value as? [String: Any], let used = number(row[percentKey]), used >= 0 else { return nil }
         return QuotaWindow(label, used: used, resetsAt: date(row[resetKey]))
     }
+    private static func extraUsage(_ value: Any?) -> ExtraUsage? {
+        guard let row = value as? [String: Any], row["is_enabled"] as? Bool == true else { return nil }
+        let used = number(row["used_credits"]).flatMap { $0 >= 0 ? $0 / 100 : nil }
+        let limit = number(row["monthly_limit"] ?? row["monthly_credit_limit"]).flatMap { $0 > 0 ? $0 / 100 : nil }
+        let utilization = number(row["utilization"]).flatMap { $0 >= 0 ? $0 : nil }
+        let rawCurrency = (row["currency"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currency = rawCurrency?.isEmpty == false ? rawCurrency!.uppercased() : nil
+        let resetsAt = date(row["resets_at"])
+        guard used != nil || limit != nil || utilization != nil else { return nil }
+        return ExtraUsage(used: used, limit: limit, utilization: utilization, currency: currency, resetsAt: resetsAt)
+    }
     public static func parse(_ data: Data, provider: Provider, now: Date = Date()) throws -> UsageSnapshot {
         let root = try object(data)
         var windows: [QuotaWindow] = []
         var plan = provider.title
+        var extra: ExtraUsage?
         switch provider {
         case .claude:
             for (key, label) in [("five_hour", "5 hours"), ("seven_day", "Weekly"), ("seven_day_sonnet", "Sonnet · Weekly"), ("seven_day_opus", "Opus · Weekly"), ("seven_day_oauth_apps", "OAuth apps · Weekly")] {
@@ -59,6 +71,7 @@ public enum UsageParser {
                     windows[index] = w
                 } else { windows.append(w) }
             }
+            extra = extraUsage(root["extra_usage"])
         case .codex:
             plan = (root["plan_type"] as? String)?.replacingOccurrences(of: "_", with: " ").capitalized ?? "ChatGPT"
             func appendLimits(_ limits: [String: Any], prefix: String = "") {
@@ -90,8 +103,8 @@ public enum UsageParser {
                 windows.append(QuotaWindow(label, used: used, resetsAt: reset))
             }
         }
-        guard !windows.isEmpty else { throw MonitorError.invalidPayload }
-        return UsageSnapshot(plan: plan, windows: windows)
+        guard !windows.isEmpty || extra != nil else { throw MonitorError.invalidPayload }
+        return UsageSnapshot(plan: plan, windows: windows, extraUsage: extra)
     }
     public static func resets(_ data: Data) throws -> ResetCredits {
         let root = try object(data)

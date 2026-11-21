@@ -2,7 +2,7 @@
 
 Checked on 2026-10-18 against the public CodexBar provider documentation and implementation. These routes are compatibility integrations, not a promise of stable public APIs.
 
-Claude browser sessions use `GET https://claude.ai/api/organizations`, then `/api/organizations/{uuid}/usage`. OAuth tokens use `GET https://api.anthropic.com/api/oauth/usage` with the `anthropic-beta: oauth-2025-04-20` header. The parser supports five-hour, weekly, model-specific weekly, and newer scoped `limits` entries. Percentages are provider-reported utilization, not token-count estimates.
+Claude browser sessions use `GET https://claude.ai/api/organizations`, then `/api/organizations/{uuid}/usage`. OAuth tokens use `GET https://api.anthropic.com/api/oauth/usage` with the `anthropic-beta: oauth-2025-04-20` header. The parser supports five-hour, weekly, model-specific weekly, newer scoped `limits` entries, and `extra_usage` spend limits (converted from minor currency units when `is_enabled` is true). Percentages are provider-reported utilization, not token-count estimates.
 
 Codex uses `GET https://chatgpt.com/backend-api/wham/usage`. The same credential and optional `ChatGPT-Account-Id` scope are used for `/wham/rate-limit-reset-credits`. Window labels come from `limit_window_seconds`, so a weekly-only plan is not mislabeled as five-hour usage. Extra model-specific limits are shown separately. The reset endpoint is read-only.
 

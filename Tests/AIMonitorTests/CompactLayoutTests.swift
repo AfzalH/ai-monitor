@@ -2,10 +2,12 @@ import Testing
 import MonitorCore
 @testable import AIMonitor
 
-@Test func compactLimitsPreferAccountWideFiveHourAndWeek() {
+@Test func compactLimitsShowThreeByDefaultPreferringAccountWidePeriods() {
     let windows = [QuotaWindow("Sonnet · Weekly", used: 9), QuotaWindow("Monthly", used: 10), QuotaWindow("Weekly", used: 2), QuotaWindow("5 hours", used: 3)]
-    #expect(CompactLimits.primaryIndices(windows) == [3, 2])
-    #expect(CompactLimits.primaryIndices([QuotaWindow("Weekly", used: 2), QuotaWindow("Monthly", used: 4)]) == [0])
+    #expect(CompactLimits.primaryIndices(windows) == [3, 2, 1])
+    let fourScoped = [QuotaWindow("5 hours", used: 3), QuotaWindow("Weekly", used: 2), QuotaWindow("Sonnet · Weekly", used: 9), QuotaWindow("Opus · Weekly", used: 4)]
+    #expect(CompactLimits.primaryIndices(fourScoped) == [0, 1, 2])
+    #expect(CompactLimits.primaryIndices([QuotaWindow("Weekly", used: 2), QuotaWindow("Monthly", used: 4)]) == [0, 1])
     #expect(CompactLimits.primaryIndices([QuotaWindow("Monthly", used: 4)]) == [0])
     #expect(CompactLimits.primaryIndices([]).isEmpty)
 }
