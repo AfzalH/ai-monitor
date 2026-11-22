@@ -3,13 +3,14 @@ import AppKit
 import MonitorCore
 
 extension Provider {
-    var symbol: String { switch self { case .claude: "sun.max"; case .codex: "terminal"; case .opencode: "chevron.left.forwardslash.chevron.right" } }
-    var color: Color { switch self { case .claude: Color(red: 0.73, green: 0.40, blue: 0.28); case .codex: Color(red: 0.17, green: 0.48, blue: 0.46); case .opencode: Color(red: 0.41, green: 0.43, blue: 0.67) } }
+    var symbol: String { switch self { case .claude: "sun.max"; case .codex: "terminal"; case .opencode: "chevron.left.forwardslash.chevron.right"; case .antigravity: "sparkles" } }
+    var color: Color { switch self { case .claude: Color(red: 0.73, green: 0.40, blue: 0.28); case .codex: Color(red: 0.17, green: 0.48, blue: 0.46); case .opencode: Color(red: 0.41, green: 0.43, blue: 0.67); case .antigravity: Color(red: 0.26, green: 0.42, blue: 0.80) } }
     var dashboardURL: URL {
         let value = switch self {
         case .claude: "https://claude.ai/settings/usage"
         case .codex: "https://chatgpt.com/codex/settings/usage"
         case .opencode: "https://opencode.ai/console"
+        case .antigravity: "https://antigravity.google/pricing"
         }
         return URL(string: value)!
     }

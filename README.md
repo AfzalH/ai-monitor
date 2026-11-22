@@ -1,14 +1,14 @@
 # QuotaBar for AI
 
-A native macOS menu bar app for multiple Claude, Codex through ChatGPT, and OpenCode accounts. Requires macOS 14 or later. No third-party package dependencies.
+A native macOS menu bar app for multiple Claude, Codex through ChatGPT, OpenCode, and Antigravity accounts. Requires macOS 14 or later. No third-party package dependencies.
 
 ## Install
 
-[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.22/QuotaBar-for-AI-0.1.22.zip)
+[Download QuotaBar for AI for macOS](https://github.com/AfzalH/ai-monitor/releases/download/v0.1.23/QuotaBar-for-AI-0.1.23.zip)
 
-Previously named AI Monitor. The current GitHub release is v0.1.22, build 23. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
+Previously named AI Monitor. The current GitHub release is v0.1.23, build 24. The separate Mac App Store version, 1.0.0 build 20, is awaiting Apple review.
 
-1. Download and unzip **QuotaBar-for-AI-0.1.22.zip**.
+1. Download and unzip **QuotaBar-for-AI-0.1.23.zip**.
 2. Drag **QuotaBar for AI.app** into **Applications**.
 3. Open **QuotaBar for AI** and click the gauge icon in the menu bar to add your accounts.
 
@@ -39,23 +39,25 @@ Expand an account to see additional limits, such as OpenCode Go's monthly quota.
 ## Build from source
 
 ```sh
+cp .env.example .env   # optional: set ANTIGRAVITY_CLIENT_SECRET to enable Antigravity
 ./scripts/build-app.sh
 open "dist/QuotaBar for AI.app"
 ```
 
 Click the gauge icon in the menu bar, then **Add your first account**. The gear opens account management. You can move the app to Applications after building. Enable launch at login from its settings after moving it.
 
-The menu bar can show several accounts, including multiple accounts from the same provider, with optional prefixes such as `x1 80% · x2 50%`. Each connected account row in Settings has its own Menu bar checkbox and prefix. Prefixes are empty by default. The first account is selected by default. Selections and prefixes stay with the account when renamed or reordered. Only selected accounts refresh in the background. Codex and OpenCode check once per minute. Claude checks no more often than every five minutes, across automatic and manual refreshes. Uncheck every account for an icon-only menu item. The compact popover shows 5-hour and weekly limits by default, with Show more for additional windows, plus reset countdowns and Codex banked resets. Settings contains the Used / Remaining switch, account renaming and ordering, and a maximum popout height control, defaulting to 40% of the screen. The popout shrinks to fit shorter lists. Usage refreshes on opening at most once per minute, including after failed attempts. Clicking Refresh bypasses the popout cooldown, but never a provider throttle. Other accounts refresh only on opening or manual refresh.
+The menu bar can show several accounts, including multiple accounts from the same provider, with optional prefixes such as `x1 80% · x2 50%`. Each connected account row in Settings has its own Menu bar checkbox and prefix. Prefixes are empty by default. The first account is selected by default. Selections and prefixes stay with the account when renamed or reordered. Only selected accounts refresh in the background. Codex, OpenCode, and Antigravity check once per minute. Claude checks no more often than every five minutes, across automatic and manual refreshes. Uncheck every account for an icon-only menu item. The compact popover shows 5-hour and weekly limits by default, with Show more for additional windows, plus reset countdowns and Codex banked resets. Settings contains the Used / Remaining switch, account renaming and ordering, and a maximum popout height control, defaulting to 40% of the screen. The popout shrinks to fit shorter lists. Usage refreshes on opening at most once per minute, including after failed attempts. Clicking Refresh bypasses the popout cooldown, but never a provider throttle. Other accounts refresh only on opening or manual refresh.
 
 ## Connect accounts
 
 - **Claude:** default-browser authorization or a subscription OAuth access token. Browser authorization uses the Claude Code OAuth flow, with a temporary loopback callback and PKCE. The app receives the result automatically.
+- **Antigravity:** default-browser Google sign-in only. It uses the Antigravity CLI's Google OAuth client and shows the Gemini, Claude & GPT (shared), and Gemini Argon 5-hour and weekly limits.
 - **Codex:** default-browser authorization, an OAuth access token, or import a Codex `auth.json` file. Import current login respects `CODEX_HOME`, falling back to `~/.codex`. This monitors Codex usage through ChatGPT, not OpenAI API spending or ChatGPT chat-model limits.
 - **OpenCode:** open the console in your default browser and paste a Go API key. An advanced console Cookie-header option lets you choose a workspace and detects Go versus prepaid Zen billing. Zen displays its balance and spending over the last 30 days, without inventing a subscription quota.
 
 Add each subscription separately and give it a name. Claude and Codex browser sign-ins use separate authorization requests. Your default browser may already have a provider session, so select or switch to the intended account on the provider page when adding a backup. You can connect the same provider more than once.
 
-Claude and Codex browser sign-ins renew their access tokens automatically. The app stores the refresh token in Keychain with the access token and renews shortly before expiry or after the provider rejects the token. Pasted access tokens, imported CLI credentials, and cookies cannot be renewed. Use **Reconnect** when prompted. Accounts connected before 0.1.20 have no refresh token, so reconnect them once. Use **Rename** to change a saved account name without signing in again. Imported CLI credentials are snapshots; the app never modifies the original auth file or redeems its refresh token, because doing so would sign the CLI out. No embedded browser is used. Claude opens your default browser and returns through a temporary localhost callback. Codex uses loopback port 1455, falling back to 1457 if occupied. Each callback requires the matching state and PKCE verifier. Sign-in times out after ten minutes and cancellation closes the listener. OpenCode has no automatic external-browser session transfer in this version.
+Claude, Codex, and Antigravity browser sign-ins renew their access tokens automatically. The app stores the refresh token in Keychain with the access token and renews shortly before expiry or after the provider rejects the token. Pasted access tokens, imported CLI credentials, and cookies cannot be renewed. Use **Reconnect** when prompted. Accounts connected before 0.1.20 have no refresh token, so reconnect them once. Use **Rename** to change a saved account name without signing in again. Imported CLI credentials are snapshots; the app never modifies the original auth file or redeems its refresh token, because doing so would sign the CLI out. No embedded browser is used. Claude opens your default browser and returns through a temporary localhost callback. Codex uses loopback port 1455, falling back to 1457 if occupied. Each callback requires the matching state and PKCE verifier. Sign-in times out after ten minutes and cancellation closes the listener. OpenCode has no automatic external-browser session transfer in this version.
 
 ## Local data
 

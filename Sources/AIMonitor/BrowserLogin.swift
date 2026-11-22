@@ -48,7 +48,11 @@ import MonitorCore
                 } else { port = try await callback.start() }
                 try Task.checkCancellation()
                 guard generation == expectedGeneration, let activeServer = server else { return }
-                let redirect = provider == .claude ? "http://localhost:\(port)/callback" : "http://127.0.0.1:\(port)/auth/callback"
+                let redirect = switch provider {
+                case .claude: "http://localhost:\(port)/callback"
+                case .antigravity: "http://127.0.0.1:\(port)/oauth2callback"
+                default: "http://127.0.0.1:\(port)/auth/callback"
+                }
                 let attempt = try OAuthAttempt(provider: provider, redirectURI: URL(string: redirect)!)
                 activeServer.attempt = attempt
                 guard openBrowser(attempt.authorizationURL) else { throw MonitorError.message("Could not open your default browser. Check your macOS browser setting and try again.") }

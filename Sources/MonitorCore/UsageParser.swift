@@ -102,9 +102,40 @@ public enum UsageParser {
                 if reset == nil, let seconds = number(row["resetInSec"]), seconds >= 0 { reset = now.addingTimeInterval(seconds) }
                 windows.append(QuotaWindow(label, used: used, resetsAt: reset))
             }
+        case .antigravity:
+            windows = antigravity(root)
         }
         guard !windows.isEmpty || extra != nil else { throw MonitorError.invalidPayload }
         return UsageSnapshot(plan: plan, windows: windows, extraUsage: extra)
+    }
+    /// `retrieveUserQuotaSummary` groups buckets by model family; each family has
+    /// its own 5-hour and weekly limit.
+    static func antigravity(_ root: [String: Any]) -> [QuotaWindow] {
+        var groups = root["groups"] as? [[String: Any]] ?? []
+        if !groups.contains(where: { ($0["buckets"] as? [Any])?.isEmpty == false }) { groups = [["buckets": root["buckets"] ?? []]] }
+        var windows: [QuotaWindow] = []
+        for group in groups {
+            let groupName = (group["displayName"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            for bucket in group["buckets"] as? [[String: Any]] ?? [] {
+                guard bucket["disabled"] as? Bool != true, let id = bucket["bucketId"] as? String, !id.isEmpty,
+                      let left = number(bucket["remainingFraction"]) else { continue }
+                // Argon and Carbon are metered apart from the main Gemini buckets.
+                let family = id.hasPrefix("gemini-argon-") || id.hasPrefix("gemini-carbon-") ? (groupName?.isEmpty == false ? groupName! : "Gemini")
+                    : id.hasPrefix("gemini-") ? "Gemini" : id.hasPrefix("3p-") ? "Claude & GPT"
+                    : groupName?.isEmpty == false ? groupName! : id
+                let period = switch bucket["window"] as? String {
+                case "5h": "5 hours"
+                case "weekly": "Weekly"
+                default: (bucket["displayName"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Quota"
+                }
+                let label = "\(family) · \(period)"
+                guard !windows.contains(where: { $0.label == label }) else { continue }
+                // An untouched bucket reports a rolling reset that moves with every request.
+                let untouched = left >= 1 && bucket["description"] == nil
+                windows.append(QuotaWindow(label, used: (1 - min(1, max(0, left))) * 100, resetsAt: untouched ? nil : date(bucket["resetTime"])))
+            }
+        }
+        return windows
     }
     public static func resets(_ data: Data) throws -> ResetCredits {
         let root = try object(data)

@@ -1,8 +1,10 @@
 import Foundation
 
 public enum Provider: String, Codable, CaseIterable, Sendable {
-    case claude, codex, opencode
-    public var title: String { switch self { case .claude: "Claude"; case .codex: "Codex"; case .opencode: "OpenCode" } }
+    case claude, codex, opencode, antigravity
+    /// Antigravity needs a client secret supplied at build time.
+    public var isAvailable: Bool { self != .antigravity || OAuthAttempt.antigravityClientSecret != nil }
+    public var title: String { switch self { case .claude: "Claude"; case .codex: "Codex"; case .opencode: "OpenCode"; case .antigravity: "Antigravity" } }
 }
 public struct QuotaWindow: Identifiable, Codable, Sendable {
     public var id: String { label }

@@ -9,6 +9,7 @@ public struct OAuthAttempt: Sendable {
     public let state: String
     public init(provider: Provider, redirectURI: URL, verifier: String? = nil, state: String? = nil) throws {
         guard provider != .opencode else { throw MonitorError.message("OpenCode uses a Go API key or console session.") }
+        if provider == .antigravity { _ = try Self.requireAntigravitySecret() }
         self.provider = provider; self.redirectURI = redirectURI
         self.verifier = try verifier ?? Self.randomToken()
         self.state = try state ?? Self.randomToken()
@@ -20,19 +21,54 @@ public struct OAuthAttempt: Sendable {
     }
     private var clientID: String { Self.clientID(provider) }
     private static func clientID(_ provider: Provider) -> String {
-        provider == .claude ? "9d1c250a-e61b-44d9-88ed-5944d1962f5e" : "app_EMoamEEZ73f0CkXaXp7hrann"
+        switch provider {
+        case .claude: "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+        case .antigravity: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
+        default: "app_EMoamEEZ73f0CkXaXp7hrann"
+        }
     }
+    /// Google installed-app clients need their (non-confidential) secret for every
+    /// token request. It is kept out of the repository: the build scripts copy
+    /// `ANTIGRAVITY_CLIENT_SECRET` from `.env` into the app's Info.plist.
+    static let antigravitySecretKey = "QBAntigravityClientSecret"
+    nonisolated(unsafe) static var antigravitySecretOverride: String?
+    static var antigravityClientSecret: String? {
+        let value = antigravitySecretOverride
+            ?? (Bundle.main.object(forInfoDictionaryKey: antigravitySecretKey) as? String)
+            ?? ProcessInfo.processInfo.environment["ANTIGRAVITY_CLIENT_SECRET"]
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // An unexpanded `$(ANTIGRAVITY_CLIENT_SECRET)` means the build had no secret.
+        return trimmed.isEmpty || trimmed.hasPrefix("$(") ? nil : trimmed
+    }
+    static func requireAntigravitySecret() throws -> String {
+        guard let secret = antigravityClientSecret else { throw MonitorError.message("Antigravity is not available in this build.") }
+        return secret
+    }
+    /// `cloud-platform` is the narrowest scope the quota endpoint accepts.
+    static let antigravityScope = "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/cloud-platform"
     private static func tokenURL(_ provider: Provider) -> URL {
-        URL(string: provider == .claude ? "https://platform.claude.com/v1/oauth/token" : "https://auth.openai.com/oauth/token")!
+        switch provider {
+        case .claude: URL(string: "https://platform.claude.com/v1/oauth/token")!
+        case .antigravity: URL(string: "https://oauth2.googleapis.com/token")!
+        default: URL(string: "https://auth.openai.com/oauth/token")!
+        }
     }
     public var authorizationURL: URL {
-        var url = URLComponents(string: provider == .claude ? "https://claude.com/cai/oauth/authorize" : "https://auth.openai.com/oauth/authorize")!
+        let base = switch provider {
+        case .claude: "https://claude.com/cai/oauth/authorize"
+        case .antigravity: "https://accounts.google.com/o/oauth2/v2/auth"
+        default: "https://auth.openai.com/oauth/authorize"
+        }
+        var url = URLComponents(string: base)!
         var items = ["client_id": clientID, "response_type": "code", "redirect_uri": redirectURI.absoluteString,
-                     "scope": provider == .claude ? "user:profile user:inference" : "openid profile email offline_access",
+                     "scope": provider == .claude ? "user:profile user:inference" : provider == .antigravity ? Self.antigravityScope : "openid profile email offline_access",
                      "code_challenge": Data(SHA256.hash(data: Data(verifier.utf8))).base64URLEncoded,
                      "code_challenge_method": "S256", "state": state]
-        if provider == .claude { items["code"] = "true" }
-        else { items["id_token_add_organizations"] = "true"; items["codex_cli_simplified_flow"] = "true"; items["prompt"] = "login" }
+        switch provider {
+        case .claude: items["code"] = "true"
+        case .antigravity: items["access_type"] = "offline"; items["prompt"] = "consent select_account"
+        default: items["id_token_add_organizations"] = "true"; items["codex_cli_simplified_flow"] = "true"; items["prompt"] = "login"
+        }
         url.queryItems = items.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
         return url.url!
     }
@@ -61,20 +97,29 @@ public struct OAuthAttempt: Sendable {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: values)
         } else {
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-            let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-            request.httpBody = Data(values.sorted { $0.key < $1.key }.map {
-                $0.key.addingPercentEncoding(withAllowedCharacters: allowed)! + "=" + $0.value.addingPercentEncoding(withAllowedCharacters: allowed)!
-            }.joined(separator: "&").utf8)
+            if provider == .antigravity { values["client_secret"] = try Self.requireAntigravitySecret() }
+            Self.setForm(values, on: &request)
         }
         return request
     }
-    /// Matches the refresh requests made by Claude Code and the Codex CLI.
+    private static func setForm(_ values: [String: String], on request: inout URLRequest) {
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+        request.httpBody = Data(values.sorted { $0.key < $1.key }.map {
+            $0.key.addingPercentEncoding(withAllowedCharacters: allowed)! + "=" + $0.value.addingPercentEncoding(withAllowedCharacters: allowed)!
+        }.joined(separator: "&").utf8)
+    }
+    /// Matches the refresh requests made by Claude Code, the Codex CLI and the Antigravity CLI.
     public static func renewalRequest(provider: Provider, refreshToken: String) throws -> URLRequest {
         guard provider != .opencode else { throw MonitorError.invalidPayload }
         var request = URLRequest(url: tokenURL(provider))
         request.httpMethod = "POST"; request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if provider == .antigravity {
+            setForm(["grant_type": "refresh_token", "refresh_token": refreshToken, "client_id": clientID(provider),
+                     "client_secret": try requireAntigravitySecret()], on: &request)
+            return request
+        }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "grant_type": "refresh_token", "refresh_token": refreshToken, "client_id": clientID(provider),

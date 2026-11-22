@@ -118,6 +118,33 @@ public struct UsageClient: Sendable {
             var result = UsageSnapshot(plan: "Zen · Pay as you go", windows: [], balance: UsageParser.number(billing["balanceMicroCents"]).map { $0 / 100_000_000 })
             result.note = String(format: "$%.2f spent in the last 30 days. No subscription quota reported.", spend / 100_000_000)
             return result
+        case .antigravity:
+            guard credential.kind == .bearer else { throw MonitorError.invalidPayload }
+            // Personal accounts are metered on the daily host; the prod host reports
+            // them as untouched. Prod is only a fallback for accounts daily rejects.
+            do {
+                return try UsageParser.parse(await transport.get(Self.antigravityQuotaRequest(host: "daily-cloudcode-pa.googleapis.com", token: credential.secret)), provider: provider)
+            } catch MonitorError.authenticationRequired(let message) {
+                do {
+                    return try UsageParser.parse(await transport.get(Self.antigravityQuotaRequest(host: "cloudcode-pa.googleapis.com", token: credential.secret)), provider: provider)
+                } catch { throw MonitorError.authenticationRequired(message) }
+            }
         }
+    }
+    /// The quota service only answers clients that identify as Antigravity.
+    static func antigravityQuotaRequest(host: String, token: String) -> URLRequest {
+        var request = URLRequest(url: URL(string: "https://\(host)/v1internal:retrieveUserQuotaSummary")!)
+        request.httpMethod = "POST"; request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        #if arch(arm64)
+        let arch = "arm64"
+        #else
+        let arch = "amd64"
+        #endif
+        request.setValue("antigravity/hub/2.24.0 (aidev_client; os_type=darwin; arch=\(arch); cl=963137146)", forHTTPHeaderField: "User-Agent")
+        request.httpBody = Data("{}".utf8)
+        return request
     }
 }

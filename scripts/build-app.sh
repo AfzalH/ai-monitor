@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/load-env.sh
 read -r -a architectures <<< "${AI_MONITOR_ARCHS:-arm64 x86_64}"
 export MACOSX_DEPLOYMENT_TARGET=14.0
 binaries=()
@@ -32,14 +33,19 @@ cat > "$app_path/Contents/Info.plist" <<'PLIST'
 <key>CFBundleName</key><string>QuotaBar for AI</string>
 <key>CFBundleDisplayName</key><string>QuotaBar for AI</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
-<key>CFBundleVersion</key><string>23</string>
-<key>CFBundleShortVersionString</key><string>0.1.22</string>
+<key>CFBundleVersion</key><string>24</string>
+<key>CFBundleShortVersionString</key><string>0.1.23</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSUIElement</key><true/>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 PLIST
+if [[ -n "${ANTIGRAVITY_CLIENT_SECRET:-}" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :QBAntigravityClientSecret string $ANTIGRAVITY_CLIENT_SECRET" "$app_path/Contents/Info.plist"
+else
+  echo "ANTIGRAVITY_CLIENT_SECRET is not set; building without Antigravity." >&2
+fi
 identity="${CODESIGN_IDENTITY:-}"
 if [[ -z "$identity" ]]; then
   identity="$(security find-identity -v -p codesigning | sed -nE 's/.*"(Developer ID Application: [^"]+)".*/\1/p' | head -1)"

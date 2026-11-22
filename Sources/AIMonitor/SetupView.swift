@@ -31,12 +31,12 @@ struct SetupView: View {
                 .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Form {
                 Picker("Provider", selection: $provider) {
-                    ForEach(Provider.allCases, id: \.self) { Text($0.title).tag($0) }
+                    ForEach(Provider.allCases.filter { $0.isAvailable || $0 == provider }, id: \.self) { Text($0.title).tag($0) }
                 }.disabled(existing != nil || busy)
                 TextField("Account name", text: $name, prompt: Text("e.g. Personal or Backup"))
                 Picker("Connect with", selection: $method) {
                     if provider != .opencode { Text("Default browser sign-in").tag(0) }
-                    Text(provider == .opencode ? "Go API key" : "Access token").tag(1)
+                    if provider != .antigravity { Text(provider == .opencode ? "Go API key" : "Access token").tag(1) }
                     if provider == .codex { Text("Codex login file").tag(2) }
                     if provider == .opencode { Text("Console session, advanced").tag(3) }
                 }.disabled(busy)
