@@ -10,15 +10,23 @@ private actor TokenTransport: UsageTransport {
         return Data(#"{"access_token":"browser-fixture","token_type":"Bearer"}"#.utf8)
     }
 }
+@MainActor private final class FakePresenter: SignInPresenter {
+    var opened: URL?
+    var dismissed = false
+    var succeeds = true
+    var cancel: (@MainActor () -> Void)?
+    func start(url: URL, onUserCancel: @escaping @MainActor () -> Void) -> Bool { opened = url; cancel = onUserCancel; return succeeds }
+    func dismiss() { dismissed = true }
+}
 @Test @MainActor func externalBrowserFlowHandsTheCredentialBackAutomatically() async throws {
     let transport = TokenTransport()
-    var opened: URL?
+    let presenter = FakePresenter()
     var received: Credential?
-    let login = BrowserLogin(provider: .claude, transport: transport, openBrowser: { opened = $0; return true }) { received = $0 }
+    let login = BrowserLogin(provider: .claude, transport: transport, presenter: presenter) { received = $0 }
     login.show()
     defer { login.close() }
-    for _ in 0..<300 where opened == nil { try await Task.sleep(for: .milliseconds(10)) }
-    let authorization = try #require(opened)
+    for _ in 0..<300 where presenter.opened == nil { try await Task.sleep(for: .milliseconds(10)) }
+    let authorization = try #require(presenter.opened)
     let items = URLComponents(url: authorization, resolvingAgainstBaseURL: false)!.queryItems!
     let redirect = try #require(items.first { $0.name == "redirect_uri" }?.value)
     let state = try #require(items.first { $0.name == "state" }?.value)
@@ -29,6 +37,7 @@ private actor TokenTransport: UsageTransport {
     #expect(received?.secret == "browser-fixture")
     #expect(!login.isRunning)
     #expect(login.error == nil)
+    #expect(presenter.dismissed)
     let requests = await transport.requests
     #expect(requests.count == 1)
     #expect(requests.first?.httpMethod == "POST")
@@ -36,11 +45,25 @@ private actor TokenTransport: UsageTransport {
 }
 @Test @MainActor func defaultBrowserFailureIsVisibleAndDoesNotConnect() async throws {
     var completed = false
-    let login = BrowserLogin(provider: .claude, openBrowser: { _ in false }) { _ in completed = true }
+    let presenter = FakePresenter(); presenter.succeeds = false
+    let login = BrowserLogin(provider: .claude, presenter: presenter) { _ in completed = true }
     login.show()
     defer { login.close() }
     for _ in 0..<300 where login.isRunning { try await Task.sleep(for: .milliseconds(10)) }
     #expect(login.error != nil)
     #expect(!login.isRunning)
+    #expect(!completed)
+}
+@Test @MainActor func closingTheSignInWindowStopsTheLogin() async throws {
+    let presenter = FakePresenter()
+    var completed = false
+    let login = BrowserLogin(provider: .claude, presenter: presenter) { _ in completed = true }
+    login.show()
+    defer { login.close() }
+    for _ in 0..<300 where presenter.cancel == nil { try await Task.sleep(for: .milliseconds(10)) }
+    let cancel = try #require(presenter.cancel)
+    cancel()
+    #expect(!login.isRunning)
+    #expect(login.error == "The sign-in window closed before sign-in finished. Start again.")
     #expect(!completed)
 }

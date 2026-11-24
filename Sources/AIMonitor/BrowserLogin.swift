@@ -1,4 +1,5 @@
 import AppKit
+import AuthenticationServices
 import SwiftUI
 import MonitorCore
 
@@ -12,14 +13,14 @@ import MonitorCore
     private var server: OAuthCallbackServer?
     private var generation = UUID()
     private let completion: (Credential) -> Void
-    private let openBrowser: (URL) -> Bool
     private let transport: any UsageTransport
+    private let webAuth: any SignInPresenter
     init(provider: Provider, transport: any UsageTransport = NetworkTransport(),
-         openBrowser: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }, completion: @escaping (Credential) -> Void) {
-        self.provider = provider; self.transport = transport; self.openBrowser = openBrowser; self.completion = completion
+         presenter: any SignInPresenter = WebAuthenticationPresenter(), completion: @escaping (Credential) -> Void) {
+        self.provider = provider; self.transport = transport; self.webAuth = presenter; self.completion = completion
     }
     func close() {
-        generation = UUID(); operation?.cancel(); timeout?.cancel(); server?.stop(); server = nil; isRunning = false
+        generation = UUID(); operation?.cancel(); timeout?.cancel(); server?.stop(); server = nil; webAuth.dismiss(); isRunning = false
     }
     func show() {
         close(); error = nil; isRunning = true; status = "Preparing secure sign-in…"
@@ -55,9 +56,15 @@ import MonitorCore
                 }
                 let attempt = try OAuthAttempt(provider: provider, redirectURI: URL(string: redirect)!)
                 activeServer.attempt = attempt
-                guard openBrowser(attempt.authorizationURL) else { throw MonitorError.message("Could not open your default browser. Check your macOS browser setting and try again.") }
-                status = "Finish signing in in your browser. QuotaBar for AI will receive the result automatically."
+                let started = webAuth.start(url: attempt.authorizationURL) { [weak self] in
+                    // The person closed the sign-in sheet before the redirect arrived.
+                    guard let self, self.generation == expectedGeneration, self.isRunning else { return }
+                    self.close(); self.error = "The sign-in window closed before sign-in finished. Start again."
+                }
+                guard started else { throw MonitorError.message("Could not open the sign-in window. Try again.") }
+                status = "Finish signing in in the sign-in window. QuotaBar for AI will receive the result automatically."
                 let code = try await activeServer.waitForCode()
+                webAuth.dismiss()
                 try Task.checkCancellation()
                 status = "Completing sign-in…"
                 let data = try await transport.get(attempt.tokenRequest(code: code))
@@ -74,6 +81,45 @@ import MonitorCore
                 if !(error is CancellationError) { self.error = error.localizedDescription }
             }
         }
+    }
+}
+
+@MainActor protocol SignInPresenter: AnyObject {
+    /// Shows the sign-in page. `onUserCancel` runs if the session ends (closed or failed) before the redirect arrives.
+    func start(url: URL, onUserCancel: @escaping @MainActor () -> Void) -> Bool
+    func dismiss()
+}
+
+/// Shows the provider's sign-in page in an `ASWebAuthenticationSession`.
+/// The providers' OAuth clients only accept loopback redirects, so the code still
+/// arrives at `OAuthCallbackServer`; the session is dismissed once it does.
+@MainActor final class WebAuthenticationPresenter: NSObject, SignInPresenter, ASWebAuthenticationPresentationContextProviding {
+    private var session: ASWebAuthenticationSession?
+    func start(url: URL, onUserCancel: @escaping @MainActor () -> Void) -> Bool {
+        dismiss()
+        // The scheme never matches: completion only fires when the session ends without our redirect.
+        let finished: @Sendable (URL?, (any Error)?) -> Void = { [weak self] _, _ in
+            Task { @MainActor in
+                // `dismiss()` clears `session` first, so this only runs when the session ended on its own.
+                guard let self, self.session != nil else { return }
+                self.session = nil
+                onUserCancel()
+            }
+        }
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "quotabar-oauth", completionHandler: finished)
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        self.session = session
+        guard session.start() else { self.session = nil; return false }
+        return true
+    }
+    func dismiss() {
+        guard let session else { return }
+        self.session = nil
+        session.cancel()
+    }
+    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        MainActor.assumeIsolated { NSApp.keyWindow ?? NSApp.windows.first { $0.isVisible } ?? ASPresentationAnchor() }
     }
 }
 

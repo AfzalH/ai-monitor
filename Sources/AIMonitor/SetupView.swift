@@ -42,7 +42,7 @@ struct SetupView: View {
                 }.disabled(busy)
             }
             if method == 0 {
-                Text("Opens your default browser. Authorize the subscription account you want to monitor, then return here. To add another account, select it on the provider’s sign-in page.")
+                Text("Opens a secure macOS sign-in window. Authorize the subscription account you want to monitor, then return here. To add another account, select it on the provider’s sign-in page.")
                     .font(.callout).foregroundStyle(.secondary)
                 Button("Sign in to \(provider.title)…") {
                     login?.close(); generation = UUID(); credential = nil
